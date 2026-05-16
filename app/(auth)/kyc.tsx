@@ -1,5 +1,6 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { requestOtp } from "@/services/auth";
+import { showToast } from "@/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -55,6 +56,12 @@ export default function KYCScreen() {
   const { mutate, isPending, isError, isSuccess } = useMutation({
     mutationFn: async () => await requestOtp("signup", phone as string),
     mutationKey: ["REGISTER", phone],
+    onError: (error: any) => {
+      showToast.error(
+        "Verification Failed",
+        error?.message || "Something went wrong. Please try again.",
+      );
+    },
   });
 
   const handleSubmit = () => {
@@ -81,11 +88,7 @@ export default function KYCScreen() {
     }
   }, [isSuccess]);
 
-  useEffect(() => {
-    if (isError) {
-      alert("An error occurred");
-    }
-  }, [isError]);
+  // Remove existing useEffect error handling since we use onError in mutation
 
   return (
     <ScreenView>

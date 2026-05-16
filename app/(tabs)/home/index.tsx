@@ -1,8 +1,8 @@
 import FraudDetailModal from "@/components/sections/FraudDetailModal";
 import QRModal from "@/components/sections/QRModal";
-import { getMe, getTransactions } from "@/services/user";
+import { getMe, getTransactions, getWalletBalance } from "@/services/user";
 import { useUserStore } from "@/store/userStore";
-import { koboToNaira } from "@/utils/currency";
+import { formatNaira, koboToNaira } from "@/utils/currency";
 import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -93,6 +93,18 @@ export default function HomeScreen() {
     retry: 1,
   });
 
+  const {
+    data: balanceData,
+    isLoading: loadingBalance,
+    isRefetching: refetchingBalance,
+    error: balanceError,
+  } = useQuery({
+    queryKey: ["wallet-balance", accessToken],
+    queryFn: getWalletBalance,
+    enabled: !!accessToken,
+    retry: 1,
+  });
+
   const user =
     accessToken && userData ? userData?.data || userData : DEFAULT_USER;
 
@@ -103,6 +115,7 @@ export default function HomeScreen() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["user-me"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["wallet-balance"] }),
         minDelay,
       ]);
     } finally {
@@ -110,9 +123,15 @@ export default function HomeScreen() {
     }
   };
 
-  const refreshing = isRefreshing || refetchingUser || refetchingTransactions;
-  const error = userError || transactionsError;
-  const walletBalance = user?.wallet?.balance ?? user?.balance ?? 0;
+  const refreshing =
+    isRefreshing ||
+    refetchingUser ||
+    refetchingTransactions ||
+    refetchingBalance;
+  const error = userError || transactionsError || balanceError;
+
+  const walletBalance = balanceData?.data?.balance || "";
+
   const transactions: Transaction[] =
     transactionsData?.transactions ??
     transactionsData?.data?.transactions ??
@@ -157,7 +176,7 @@ export default function HomeScreen() {
             </Text>
             <View className="flex-row items-baseline">
               <Text className="text-white font-clash-bold text-4xl">
-                {koboToNaira(walletBalance)}
+                {formatNaira(walletBalance)}
               </Text>
             </View>
             <View className="bg-purple-600 px-4 py-1.5 rounded-full mt-4">
@@ -378,4 +397,3 @@ function TransactionItem({
     </TouchableOpacity>
   );
 }
-

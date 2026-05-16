@@ -1,5 +1,6 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { requestOtp, verifyOtp } from "@/services/auth";
+import { showToast } from "@/utils/toast";
 import { useAppState } from "@/store/appState";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -90,7 +91,7 @@ export default function OTPScreen() {
     },
     onError: (error: any) => {
       console.error("Verification Error:", error);
-      Alert.alert(
+      showToast.error(
         "Verification Failed",
         error?.message || "Invalid code. Please try again.",
       );
@@ -100,10 +101,10 @@ export default function OTPScreen() {
   const { mutate: resendMutate, isPending: isResending } = useMutation({
     mutationFn: async () => await requestOtp(mode as string, phone as string),
     onSuccess: () => {
-      Alert.alert("Success", "OTP has been resent to your phone.");
+      showToast.success("Success", "OTP has been resent to your phone.");
     },
     onError: () => {
-      Alert.alert("Error", "Failed to resend OTP. Please try again.");
+      showToast.error("Error", "Failed to resend OTP. Please try again.");
     },
   });
 
@@ -130,7 +131,7 @@ export default function OTPScreen() {
 
     const otpValue = otp.join("");
     if (otpValue.length < 6) {
-      Alert.alert("Error", "Please enter the complete 6-digit code");
+      showToast.error("Error", "Please enter the complete 6-digit code");
       return;
     }
 

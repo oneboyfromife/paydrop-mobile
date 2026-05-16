@@ -1,6 +1,7 @@
 import { getDeviceId } from "@/lib/deviceId";
 import axios from "axios";
 import { useUserStore } from "../store/userStore";
+import { showToast } from "@/utils/toast";
 
 const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || "https://pay-drop-backend.vercel.app/api/v1",
@@ -69,6 +70,7 @@ api.interceptors.response.use(
       if (!refreshToken) {
         isRefreshing = false;
         logout();
+        showToast.error("Session Expired", "Please login again to continue.");
         return Promise.reject(error);
       }
 
@@ -95,6 +97,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         logout();
+        showToast.error("Session Expired", "Please login again to continue.");
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

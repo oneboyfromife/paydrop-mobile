@@ -9,6 +9,16 @@ export const getMe = async () => {
   }
 };
 
+export const getWalletBalance = async () => {
+  try {
+    const response = await api.get("/wallet/balance");
+    return response.data;
+  } catch (error: any) {
+    console.log("ERROR!", error);
+    throw error.response?.data || error.message;
+  }
+};
+
 export const getTransactions = async (page = 1, limit = 10) => {
   try {
     const response = await api.get("/transactions", {

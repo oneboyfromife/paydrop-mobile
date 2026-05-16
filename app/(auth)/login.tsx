@@ -1,5 +1,6 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { requestOtp } from "@/services/auth";
+import { showToast } from "@/utils/toast";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -35,7 +36,7 @@ export default function LoginScreen() {
     },
     onError: (error: any) => {
       console.error("API error", error);
-      Alert.alert(
+      showToast.error(
         "Login Failed",
         error?.message || "Something went wrong. Please try again.",
       );

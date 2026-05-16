@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "PayDrop",
-    "slug": "paydrop-mobile",
-    "version": "1.0.0",
+    "slug": "paydrop",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "paydrop",
@@ -40,6 +40,14 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_ADVERTISE",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_ADVERTISE",
         "android.permission.BLUETOOTH_CONNECT",
@@ -95,8 +103,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "3675fd77-9901-4d22-ba8f-2f95f7f32ec4"
+        "projectId": "7047b5c0-9a0c-47d7-a3a2-15ddfdb30ba8"
       }
-    }
+    },
+    "owner": "victorfaruna"
   }
 }

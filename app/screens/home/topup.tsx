@@ -1,6 +1,7 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
+import { showToast } from "@/utils/toast";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import {
@@ -23,11 +24,7 @@ export default function TopUpScreen() {
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(accountNumber);
-    if (Platform.OS === "android") {
-      ToastAndroid.show("Copied!", ToastAndroid.SHORT);
-    } else {
-      Alert.alert("Copied!", "Account number copied to clipboard.");
-    }
+    showToast.success("Copied!", "Account number copied to clipboard.");
   };
 
   const handleShare = async () => {

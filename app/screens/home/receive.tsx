@@ -109,7 +109,7 @@ export default function ReceiveScreen() {
         {/* Header */}
         <View className="px-6 pt-4 pb-4 bg-white flex-row justify-between items-center">
           <View>
-            <Text className="text-black font-clash-semibold text-[28px]">
+            <Text className="text-black font-clash-semibold text-2xl ">
               Receive Money
             </Text>
             <View className="flex-row items-center">
@@ -117,7 +117,9 @@ export default function ReceiveScreen() {
                 className={`w-2 h-2 rounded-full mr-2 ${isAdvertising ? "bg-green-500" : "bg-red-500"}`}
               />
               <Text className="text-[#6B7280] font-clash-medium text-[12px]">
-                {isAdvertising ? "Discoverable to nearby users" : "Not discoverable"}
+                {isAdvertising
+                  ? "Discoverable to nearby users"
+                  : "Not discoverable"}
               </Text>
             </View>
           </View>
@@ -129,7 +131,7 @@ export default function ReceiveScreen() {
           </TouchableOpacity>
         </View>
 
-        <View className="flex-1 items-center px-6 mt-4">
+        <View className="flex-1 items-center px-6 mt-10">
           <View className="bg-white rounded-[32px] p-[24px] border border-grey-200 shadow-sm w-full max-w-[320px] items-center">
             {qrLoading ? (
               <View
@@ -171,7 +173,9 @@ export default function ReceiveScreen() {
                 }}
                 className="h-[64px] w-[64px] rounded-full border-2 border-purple-100"
               />
-              <View className={`absolute bottom-2 -right-0 ${isAdvertising ? "bg-green-500" : "bg-red-500"} w-4 h-4 rounded-full border-2 border-white`} />
+              <View
+                className={`absolute bottom-2 -right-0 ${isAdvertising ? "bg-green-500" : "bg-red-500"} w-4 h-4 rounded-full border-2 border-white`}
+              />
             </View>
             <Text className="mt-4 text-black font-clash-semibold text-lg">
               {fullName}
@@ -215,9 +219,9 @@ export default function ReceiveScreen() {
           )}
 
           {bleError && (
-             <Text className="mt-6 text-red-500 font-clash-medium text-xs text-center px-4">
-               {bleError}
-             </Text>
+            <Text className="mt-6 text-red-500 font-clash-medium text-xs text-center px-4">
+              {bleError}
+            </Text>
           )}
         </View>
       </View>
