@@ -197,6 +197,9 @@ export const useBLEDiscovery = (
             console.warn("[BLE] Discovery token is not a valid BLE UUID:", bleToken);
           }
 
+          const bleStatus = getBleNativeStatus();
+          console.log("[BLE] Native modules:", bleStatus);
+
           const nativeStarted = await startDiscoveryAdvertising(bleToken);
           if (nativeStarted) {
             console.log("[BLE] Advertising started with token:", bleToken);
@@ -204,7 +207,7 @@ export const useBLEDiscovery = (
             setError(null);
           } else {
             setIsAdvertising(false);
-            setError(bleAdvertisingErrorMessage(getBleNativeStatus()));
+            setError(bleAdvertisingErrorMessage(bleStatus, bleToken));
           }
         } catch (err: any) {
           console.warn("[BLE] Advertising Failed", err);

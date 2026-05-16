@@ -57,7 +57,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "./plugins/withBleAdvertiser.js",
+      "./plugins/withBleNativeModules.js",
       "expo-router",
       [
         "react-native-ble-plx",

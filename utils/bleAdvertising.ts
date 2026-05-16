@@ -2,7 +2,7 @@ import { NativeModules, Platform } from "react-native";
 
 import { isValidBleServiceUuid, normalizeDiscoveryToken } from "./discoveryToken";
 
-const BLEAdvertiser = NativeModules.BLEAdvertiser as {
+type BLEAdvertiserModule = {
   setCompanyId?: (id: number) => void;
   broadcast?: (
     uid: string,
@@ -11,13 +11,40 @@ const BLEAdvertiser = NativeModules.BLEAdvertiser as {
   ) => Promise<string>;
   stopBroadcast?: () => Promise<string>;
   getAdapterState?: () => Promise<string>;
-} | null;
+};
 
-const BLEPeripheral = NativeModules.BLEPeripheral as {
+type BLEPeripheralModule = {
   addService?: (uuid: string, primary: boolean) => void;
   stop?: () => void;
   start?: () => Promise<string>;
-} | null;
+};
+
+function loadBleAdvertiser(): BLEAdvertiserModule | null {
+  if (NativeModules.BLEAdvertiser) {
+    return NativeModules.BLEAdvertiser as BLEAdvertiserModule;
+  }
+  try {
+    const mod = require("react-native-ble-advertiser");
+    return mod ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function loadBlePeripheral(): BLEPeripheralModule | null {
+  if (NativeModules.BLEPeripheral) {
+    return NativeModules.BLEPeripheral as BLEPeripheralModule;
+  }
+  try {
+    const mod = require("react-native-ble-peripheral");
+    return mod ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const BLEAdvertiser = loadBleAdvertiser();
+const BLEPeripheral = loadBlePeripheral();
 
 export type BleNativeStatus = {
   advertiser: boolean;
@@ -51,7 +78,10 @@ const broadcastViaAdvertiser = async (token: string): Promise<boolean> => {
 
   const serviceUuid = normalizeDiscoveryToken(token);
   if (!isValidBleServiceUuid(serviceUuid)) {
-    console.warn("[BLE] Token is not a valid service UUID for advertiser:", token);
+    console.warn(
+      "[BLE] Discovery token is not a valid BLE service UUID:",
+      serviceUuid,
+    );
     return false;
   }
 
@@ -87,7 +117,6 @@ const broadcastViaPeripheral = async (token: string): Promise<boolean> => {
 
   const serviceUuid = normalizeDiscoveryToken(token);
   if (!isValidBleServiceUuid(serviceUuid)) {
-    console.warn("[BLE] Token is not a valid service UUID for peripheral:", token);
     return false;
   }
 
@@ -136,9 +165,21 @@ export const stopDiscoveryAdvertising = async () => {
   BLEPeripheral?.stop?.();
 };
 
-export const bleAdvertisingErrorMessage = (status: BleNativeStatus): string => {
+export const bleAdvertisingErrorMessage = (
+  status: BleNativeStatus,
+  token?: string | null,
+): string => {
   if (!status.advertiser && !status.peripheral) {
-    return "Bluetooth advertising needs a native build. Run: npx expo run:ios (not Expo Go), then reopen the app.";
+    return (
+      "BLE native module missing from this build. Run: npm install, then " +
+      "npx expo prebuild --clean, then npx expo run:ios --device " +
+      "(physical iPhone — BLE does not work in Simulator or Expo Go)."
+    );
   }
-  return "Could not start Bluetooth advertising. Check Bluetooth is on and try again.";
+
+  if (token && !isValidBleServiceUuid(normalizeDiscoveryToken(token))) {
+    return "Discovery token is not a valid Bluetooth UUID. QR/BLE may be out of sync — refresh your receive screen.";
+  }
+
+  return "Could not start Bluetooth advertising. Turn Bluetooth on, allow permission, and try again.";
 };
