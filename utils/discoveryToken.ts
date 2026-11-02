@@ -26,7 +26,7 @@ export const extractDiscoveryToken = (raw: string): string | null => {
 
   const lower = trimmed.toLowerCase();
 
-  if (lower.startsWith("paydrop:")) {
+  if (lower.startsWith("paydrop:") && !lower.startsWith("paydrop://")) {
     const payload = trimmed.slice("paydrop:".length).trim();
     if (!payload) return null;
     if (UUID_RE.test(payload)) return normalizeDiscoveryToken(payload);

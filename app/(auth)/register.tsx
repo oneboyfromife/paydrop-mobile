@@ -1,14 +1,12 @@
 import ScreenView from "@/components/layout/ScreenView";
+import { Text, TextInput } from "@/components/shared";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -65,21 +63,10 @@ export default function PhoneScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View className="flex-1 bg-white">
-              <View className="absolute inset-0 opacity-5">
-                <Image
-                  source={require("../../assets/images/bg-mesh.png")}
-                  className="w-full h-full"
-                />
-              </View>
-
-              <Image
-                source={require("../../assets/images/paydrop-icon-2.png")}
-                className="size-16 mt-10 mb-4"
-              />
-              <Text className="text-4xl font-clash-semibold text-black mb-2 ">
+              <Text className="text-3xl font-satoshi-bold text-black mb-2 ">
                 Register
               </Text>
-              <Text className="text-base font-clash-regular text-grey-500 mb-10 leading-6">
+              <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
                 Create an account using your phone number, name, and email.
               </Text>
 
@@ -87,7 +74,7 @@ export default function PhoneScreen() {
                 <TextInput
                   placeholder="First Name"
                   placeholderTextColor="#9CA3AF"
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={firstName}
                   onChangeText={setFirstName}
                 />
@@ -97,7 +84,7 @@ export default function PhoneScreen() {
                 <TextInput
                   placeholder="Last Name"
                   placeholderTextColor="#9CA3AF"
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={lastName}
                   onChangeText={setLastName}
                 />
@@ -110,7 +97,7 @@ export default function PhoneScreen() {
                   autoCorrect={false}
                   keyboardType="email-address"
                   autoCapitalize="none"
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={email}
                   onChangeText={setEmail}
                 />
@@ -122,21 +109,21 @@ export default function PhoneScreen() {
                   placeholderTextColor="#9CA3AF"
                   autoCorrect={false}
                   autoCapitalize="none"
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={username}
                   onChangeText={setUsername}
                 />
               </View>
 
               <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-4 border border-grey-200">
-                <Text className="text-lg font-clash-medium mr-4">+234</Text>
+                <Text className="text-lg font-satoshi-medium mr-4">+234</Text>
                 <View className="w-[1px] h-8 bg-grey-300 mr-4" />
                 <TextInput
                   placeholder="812 345 6789"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                   maxLength={10}
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={phone}
                   onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
                 />
@@ -146,7 +133,7 @@ export default function PhoneScreen() {
               <TextInput
                 placeholder="Avatar URL (optional)"
                 placeholderTextColor="#9CA3AF"
-                className="text-lg font-clash-regular text-black"
+                className="text-lg font-satoshi-regular text-black"
                 value={avatarUrl}
                 onChangeText={setAvatarUrl}
               />
@@ -160,7 +147,7 @@ export default function PhoneScreen() {
                 onPress={handleSubmit}
                 disabled={!isFormValid}
               >
-                <Text className="text-white font-clash-bold text-lg">
+                <Text className="text-white font-satoshi-bold text-lg">
                   Continue
                 </Text>
               </TouchableOpacity>
@@ -169,7 +156,7 @@ export default function PhoneScreen() {
                 className="mt-4 items-center"
                 onPress={() => router.push({ pathname: "./login" })}
               >
-                <Text className="text-purple-500 font-clash-semibold">
+                <Text className="text-purple-500 font-satoshi-bold">
                   Already have an account? Login
                 </Text>
               </TouchableOpacity>

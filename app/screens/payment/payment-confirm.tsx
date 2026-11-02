@@ -1,203 +1,128 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
-import api from "@/services/api";
-import { useUserStore } from "@/store/userStore";
+import { submitTransfer } from "@/services/transfers";
+import { useTransferStore } from "@/store/transferStore";
 import { koboToNaira } from "@/utils/currency";
-import size from "@/utils/size";
+import { relationshipLabel } from "@/utils/discoveryProfile";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useRef } from "react";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 
 export default function PaymentConfirmScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    recipientId: string;
-    recipientName: string;
-    recipientAvatar: string;
-    amount: string;
-    note: string;
-  }>();
-
-  const accessToken = useUserStore((state) => state.accessToken);
-  const [processing, setProcessing] = useState(false);
-
-  // Mock fraud score
-  const fraudScore = 24;
-  const verdict = "PENDING";
-
-  const getScoreColor = (score: number) => {
-    if (score <= 39) return "#00D68F";
-    if (score <= 69) return "#FFB347";
-    return "#FF6B6B";
-  };
-
+  const intent = useTransferStore((state) => state.active);
+  const locked = useRef(false);
+  const processing = intent?.phase === "submitting";
+  if (!intent)
+    return (
+      <ScreenView>
+        <Text className="p-6">
+          Select a recipient and review an amount first.
+        </Text>
+      </ScreenView>
+    );
+  const name = intent.recipient
+    ? `${intent.recipient.first_name} ${intent.recipient.last_name}`.trim() ||
+      intent.recipient.username
+    : "Recipient";
   const handleConfirm = async () => {
-    setProcessing(true);
+    if (locked.current || intent.phase !== "review") return;
+    locked.current = true;
     try {
-      console.log("Initiating transfer...", {
-        recipient_id: params.recipientId,
-        amount: parseInt(params.amount),
-        note: params.note,
-        nip_code: "000013",
-      });
-
-      const response = await api.post("/transactions/transfer", {
-        recipient_id: params.recipientId,
-        amount: parseInt(params.amount),
-        note: params.note,
-        nip_code: "000013",
-      });
-
-      console.log("Transfer response:", response.data);
-
-      const transferData = response.data?.data || response.data;
-      const verdict = transferData.verdict;
-
-      if (verdict === "FLAG") {
-        router.push({
-          pathname: "/screens/payment/flag-warning" as any,
-          params: {
-            confirmToken: transferData.confirm_token,
-            recipientName: params.recipientName,
-            amount: params.amount,
-            fraudScore: transferData.fraud_score?.toString() || "0",
-            fraudReason:
-              transferData.fraud_reason ||
-              "Unusual transaction pattern detected.",
-            expiresAt:
-              transferData.expires_at ||
-              new Date(Date.now() + 5 * 60000).toISOString(),
+      await submitTransfer();
+      const phase = useTransferStore.getState().active?.phase;
+      if (phase === "review") return;
+      router.replace(
+        phase === "flagged"
+          ? "/screens/payment/flag-warning"
+          : "/screens/payment/payment-result",
+      );
+    } catch (error) {
+      const active = useTransferStore.getState().active;
+      if (active)
+        useTransferStore.setState({
+          active: {
+            ...active,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Unable to submit payment.",
           },
         });
-      } else if (verdict === "ALLOW" || !verdict) {
-        router.push({
-          pathname: "/screens/payment/payment-result" as any,
-          params: {
-            txId: transferData.id || transferData.squad_ref,
-            success: "true",
-            recipientName: params.recipientName,
-            amount: params.amount,
-          },
-        });
-      } else if (verdict === "BLOCK") {
-        throw new Error(
-          transferData.fraud_reason || transferData.message || "Transaction blocked due to high fraud risk.",
-        );
-      } else {
-        throw new Error(
-          transferData.message || transferData.fraud_reason || `Transaction declined: ${verdict}`,
-        );
-      }
-    } catch (error: any) {
-      console.error("Transfer error", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Something went wrong";
-
-      router.push({
-        pathname: "/screens/payment/payment-result" as any,
-        params: {
-          success: "false",
-          error: errorMessage,
-          recipientName: params.recipientName,
-          amount: params.amount,
-        },
-      });
     } finally {
-      setProcessing(false);
+      locked.current = false;
     }
   };
-
   return (
     <ScreenView>
       <View className="flex-1 bg-white px-6 pt-4">
-        {/* Header */}
         <View className="flex-row items-center justify-between mb-12">
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity disabled={processing} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#1A1A1A" />
           </TouchableOpacity>
-          <Text className="text-[#1A1A1A] font-clash-semibold text-[22px]">
-            Confirm Payment
-          </Text>
+          <Text className="font-satoshi-bold text-[22px]">Confirm Payment</Text>
           <View className="w-6" />
         </View>
-
         <View className="items-center mb-10">
-          <Text className="text-[#1A1A1A] font-clash-bold text-[40px]">
-            {koboToNaira(parseInt(params.amount))}
+          <Text className="font-satoshi-bold text-[40px]">
+            {intent.amount !== null ? koboToNaira(intent.amount) : "Payment"}
           </Text>
-          <Text className="text-[#6B7280] font-clash-medium text-[15px] mt-2">
-            to @{params.recipientName.replace(/\s+/g, "").toLowerCase()}
-          </Text>
-        </View>
-
-        {/* Fraud Indicator Card */}
-        <View className="bg-[#F3F4F6] rounded-[16px] p-[20px]">
-          <Text className="text-[#6B7280] font-clash-bold text-[13px] uppercase mb-4">
-            Trust Check
-          </Text>
-
-          <View className="flex-row justify-between items-center mb-2">
-            <View className="h-2 flex-1 bg-[#D1D5DB] rounded-full mr-4">
-              <View
-                style={{
-                  width: `${fraudScore}%`,
-                  backgroundColor: getScoreColor(fraudScore),
-                }}
-                className="h-full rounded-full"
-              />
-            </View>
-            <Text className="text-[#1A1A1A] font-clash-semibold text-[14px]">
-              Score: {fraudScore}
+          <Text className="text-grey-500 text-base mt-2">to {name}</Text>
+          {intent.recipient?.username && (
+            <Text className="text-grey-500 mt-1">
+              @{intent.recipient.username.replace(/^@/, "")}
             </Text>
-          </View>
-
-          <View className="flex-row items-center justify-between mt-4">
-            <View
-              style={{ backgroundColor: getScoreColor(fraudScore) + "20" }}
-              className="rounded-full px-3 py-1"
-            >
-              <Text
-                style={{ color: getScoreColor(fraudScore) }}
-                className="font-clash-bold text-[12px]"
-              >
-                {verdict}
-              </Text>
-            </View>
-            {params.note ? (
-              <Text className="text-[#6B7280] font-clash-regular text-[13px] italic">
-                "{params.note}"
-              </Text>
-            ) : null}
-          </View>
+          )}
         </View>
-
-        {/* Buttons */}
+        <View className="bg-grey-50 rounded-2xl p-5">
+          <Text className="font-satoshi-bold mb-3">Payment review</Text>
+          <Text className="text-grey-500 mb-3">
+            {intent.recipient
+              ? relationshipLabel(intent.recipient)
+              : "Relationship information unavailable"}
+          </Text>
+          {intent.note ? (
+            <Text className="mb-3">Note: {intent.note}</Text>
+          ) : null}
+          <Text className="text-grey-500">
+            Check the recipient and amount. Server checks run when you confirm.
+            Internet access is required.
+          </Text>
+        </View>
+        {intent.message && (
+          <Text className="text-red-500 mt-4">{intent.message}</Text>
+        )}
         <View className="flex-1 justify-end pb-12">
           <TouchableOpacity
             onPress={handleConfirm}
-            disabled={processing}
-            style={{
-              height: size.height(54),
-            }}
-            className="bg-purple-400  rounded-full items-center justify-center w-full mb-4"
+            disabled={processing || intent.phase !== "review"}
+            className="bg-purple-500 rounded-full items-center justify-center py-4 mb-4"
           >
             {processing ? (
-              <ActivityIndicator color="black" />
+              <ActivityIndicator color="white" />
             ) : (
-              <Text className="text-white font-clash-semibold text-[16px]">
-                Confirm & Pay
+              <Text className="text-white font-satoshi-bold text-base">
+                Confirm &amp; Pay
               </Text>
             )}
           </TouchableOpacity>
+          {intent.phase !== "review" && !processing && (
+            <TouchableOpacity
+              onPress={() => router.replace("/screens/payment/payment-result")}
+              className="p-3"
+            >
+              <Text className="text-center text-purple-500">
+                Check payment status
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
+            disabled={processing}
             onPress={() => router.back()}
-            className="items-center"
+            className="items-center p-3"
           >
-            <Text className="text-[#6B7280] font-clash-medium text-[14px]">
-              Cancel
-            </Text>
+            <Text className="text-grey-500">Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>

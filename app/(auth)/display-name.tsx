@@ -1,9 +1,10 @@
+import { Text, TextInput } from "@/components/shared";
 import { useAppState } from "@/store/appState";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image, TouchableOpacity, View } from "react-native";
 
 export default function DisplayNameScreen() {
   const router = useRouter();
@@ -40,10 +41,10 @@ export default function DisplayNameScreen() {
         <Ionicons name="arrow-back" size={18} color="#000" />
       </TouchableOpacity>
 
-      <Text className="text-3xl font-clash-semibold text-black mb-2">
+      <Text className="text-3xl font-satoshi-bold text-black mb-2">
         What's your name?
       </Text>
-      <Text className="text-base font-clash-regular text-grey-500 mb-10 leading-6">
+      <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
         Enter your full name so your friends and vendors can recognize you.
       </Text>
 
@@ -51,7 +52,7 @@ export default function DisplayNameScreen() {
         <TextInput
           placeholder="e.g. John Doe"
           placeholderTextColor="#9CA3AF"
-          className="text-lg font-clash-regular text-black"
+          className="text-lg font-satoshi-regular text-black"
           value={displayName}
           onChangeText={setDisplayName}
           autoFocus
@@ -65,7 +66,7 @@ export default function DisplayNameScreen() {
         onPress={handleContinue}
         disabled={!displayName.trim()}
       >
-        <Text className="text-white font-clash-bold text-lg">Continue</Text>
+        <Text className="text-white font-satoshi-bold text-lg">Continue</Text>
       </TouchableOpacity>
     </View>
   );

@@ -1,140 +1,132 @@
+import { Text } from "@/components/shared";
+import { useTransferStore } from "@/store/transferStore";
+import { recoverTransfer } from "@/services/transfers";
+import { isUnresolved } from "@/types/transfer";
 import { koboToNaira } from "@/utils/currency";
-import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
-import { Animated, Share, Text, TouchableOpacity, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Share, TouchableOpacity, View } from "react-native";
 
 export default function PaymentResultScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    txId?: string;
-    success: string;
-    amount: string;
-    recipientName: string;
-    error?: string;
-  }>();
-
-  const isSuccess = params.success === "true";
-
-  const scaleAnim = useRef(new Animated.Value(0)).current;
-  const insightAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      friction: 6,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-
-    if (isSuccess) {
-      Animated.timing(insightAnim, {
-        toValue: 1,
-        duration: 400,
-        delay: 600,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [isSuccess]);
-
-  const handleShare = async () => {
-    if (!isSuccess) return;
+  const intent = useTransferStore((state) => state.active);
+  const [checking, setChecking] = useState(false);
+  const completed = intent?.phase === "completed";
+  const pending = !!intent && isUnresolved(intent.phase);
+  const failed = intent?.phase === "failed" || intent?.phase === "blocked";
+  const name = intent?.recipient
+    ? `${intent.recipient.first_name} ${intent.recipient.last_name}`.trim() ||
+      intent.recipient.username
+    : "";
+  const checkStatus = async () => {
+    if (checking) return;
+    setChecking(true);
     try {
-      await Share.share({
-        message: `Sent ${koboToNaira(parseInt(params.amount))} to ${params.recipientName} via PayDrop. Tx ID: ${params.txId}`,
-      });
-    } catch (error) {
-      console.error("Share error", error);
+      await recoverTransfer();
+    } finally {
+      setChecking(false);
     }
   };
-
-  const handleDone = () => {
-    router.replace("/(tabs)/home");
+  useEffect(() => {
+    if (pending) void recoverTransfer();
+  }, []);
+  const share = async () => {
+    if (!completed || !intent) return;
+    await Share.share({
+      message: `PayDrop confirmed ${intent.amount !== null ? koboToNaira(intent.amount) : "a payment"}${name ? ` to ${name}` : ""}. Reference: ${intent.transactionId || intent.idempotencyKey}`,
+    });
   };
-
   return (
     <View className="flex-1 bg-white items-center justify-center px-6">
-      <View className="items-center mb-10">
-        <Animated.View
-          style={{
-            transform: [{ scale: scaleAnim }],
-            backgroundColor: isSuccess ? "#00D68F" : "#FF6B6B",
-          }}
-          className="w-20 h-20 rounded-full items-center justify-center mb-6"
-        >
+      <View
+        style={{
+          backgroundColor: completed
+            ? "#00D68F"
+            : failed
+              ? "#FF6B6B"
+              : "#A855F7",
+        }}
+        className="w-20 h-20 rounded-full items-center justify-center mb-6"
+      >
+        {pending ? (
+          <ActivityIndicator color="white" size="large" />
+        ) : (
           <Ionicons
-            name={isSuccess ? "checkmark" : "close"}
+            name={completed ? "checkmark" : "close"}
             size={40}
             color="white"
           />
-        </Animated.View>
-
-        <Text className="text-[#1A1A1A] font-clash-bold text-[32px] mb-2">
-          {isSuccess ? "Sent!" : "Transfer Failed"}
-        </Text>
-
-        {isSuccess ? (
-          <>
-            <Text className="text-[#6B7280] font-clash-medium text-[20px] mb-1">
-              {koboToNaira(parseInt(params.amount))}
-            </Text>
-            <Text className="text-[#6B7280] font-clash-regular text-[14px]">
-              to @{params.recipientName.replace(/\s+/g, "").toLowerCase()}
-            </Text>
-            {params.txId && (
-              <Text className="text-[#9CA3AF] font-space-mono text-[10px] mt-4 uppercase">
-                ID: {params.txId.slice(0, 8)}…
-              </Text>
-            )}
-
-            <Animated.View
-              style={{
-                opacity: insightAnim,
-                transform: [
-                  {
-                    translateY: insightAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [10, 0],
-                    }),
-                  },
-                ],
-              }}
-              className="bg-[#00D68F]/10 px-4 py-2 rounded-full mt-6"
-            >
-              <Text className="text-[#00D68F] font-clash-medium text-[12px]">
-                ⚡ Trust score increased by +1
-              </Text>
-            </Animated.View>
-          </>
-        ) : (
-          <Text className="text-[#6B7280] font-clash-regular text-[16px] text-center px-8">
-            {params.error || "Something went wrong with the transfer."}
-          </Text>
         )}
       </View>
-
-      <View className="absolute bottom-12 left-6 right-6">
+      <Text className="font-satoshi-bold text-[32px] mb-3">
+        {completed
+          ? "Sent!"
+          : pending
+            ? "Processing"
+            : failed
+              ? "Payment not completed"
+              : "No payment selected"}
+      </Text>
+      {intent?.amount !== null && intent?.amount !== undefined && (
+        <Text className="font-satoshi-medium text-xl mb-2">
+          {koboToNaira(intent.amount)}
+        </Text>
+      )}
+      {!!name && <Text className="text-grey-500 mb-4">to {name}</Text>}
+      <Text className="text-grey-500 text-center mb-4">
+        {pending
+          ? intent?.message ||
+            "Waiting for the server to confirm the outcome. You can check later; do not send this payment again."
+          : intent?.message ||
+            (completed
+              ? "The server confirmed this payment is completed."
+              : "")}
+      </Text>
+      {intent && (
+        <Text selectable className="text-grey-500 text-xs text-center mb-4">
+          Reference: {intent.transactionId || intent.idempotencyKey}
+        </Text>
+      )}
+      {pending && (
         <TouchableOpacity
-          onPress={handleDone}
-          style={{
-            height: size.height(56),
-          }}
-          className="bg-purple-400 rounded-full items-center justify-center w-full mb-4"
+          disabled={checking}
+          onPress={checkStatus}
+          className="p-4"
         >
-          <Text className="text-white font-clash-semibold text-[16px]">
-            Done
+          <Text className="text-purple-500">
+            {checking ? "Checking..." : "Check status"}
           </Text>
         </TouchableOpacity>
-
-        {isSuccess && (
-          <TouchableOpacity onPress={handleShare} className="items-center">
-            <Text className="text-[#6B7280] font-clash-medium text-[14px]">
-              Share Receipt
-            </Text>
+      )}
+      {intent?.phase === "flagged" &&
+        intent.flag &&
+        intent.flag.expiresAt > Date.now() && (
+          <TouchableOpacity
+            onPress={() => router.replace("/screens/payment/flag-warning")}
+            className="p-4"
+          >
+            <Text className="text-purple-500">Review server warning</Text>
           </TouchableOpacity>
         )}
-      </View>
+      <TouchableOpacity
+        onPress={() => router.replace("/(tabs)/home")}
+        className="bg-purple-500 rounded-full items-center py-4 w-full mt-6"
+      >
+        <Text className="text-white font-satoshi-bold">
+          {pending ? "Check later" : "Done"}
+        </Text>
+      </TouchableOpacity>
+      {completed && (
+        <TouchableOpacity
+          onPress={() => {
+            void share().catch(() => {});
+          }}
+          className="p-4"
+        >
+          <Text className="text-grey-500">Share receipt</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }

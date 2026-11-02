@@ -1,3 +1,4 @@
+import { Text, TextInput } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import { requestOtp } from "@/services/auth";
 import { showToast } from "@/utils/toast";
@@ -13,8 +14,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -38,7 +37,7 @@ export default function KYCScreen() {
   const handleDobChange = (text: string) => {
     // Remove all non-digits
     const cleaned = text.replace(/\D/g, "");
-    
+
     // Format as YYYY-MM-DD
     let formatted = cleaned;
     if (cleaned.length > 4) {
@@ -47,7 +46,7 @@ export default function KYCScreen() {
     if (cleaned.length > 6) {
       formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}-${cleaned.slice(6, 8)}`;
     }
-    
+
     setDob(formatted);
   };
 
@@ -123,10 +122,10 @@ export default function KYCScreen() {
               >
                 <Ionicons name="arrow-back" size={18} color="#000" />
               </TouchableOpacity>
-              <Text className="text-4xl font-clash-semibold text-black mb-2 ">
+              <Text className="text-4xl font-satoshi-bold text-black mb-2 ">
                 KYC Verification
               </Text>
-              <Text className="text-base font-clash-regular text-grey-500 mb-10 leading-6">
+              <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
                 Please provide your BVN and Date of Birth to complete
                 registration.
               </Text>
@@ -137,7 +136,7 @@ export default function KYCScreen() {
                   placeholderTextColor="#9CA3AF"
                   keyboardType="number-pad"
                   maxLength={11}
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={bvn}
                   onChangeText={setBvn}
                 />
@@ -149,7 +148,7 @@ export default function KYCScreen() {
                   placeholderTextColor="#9CA3AF"
                   keyboardType="number-pad"
                   maxLength={10}
-                  className="flex-1 h-full font-clash-regular text-black"
+                  className="flex-1 h-full font-satoshi-regular text-black"
                   value={dob}
                   onChangeText={handleDobChange}
                 />
@@ -166,7 +165,7 @@ export default function KYCScreen() {
                 {isPending ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text className="text-white font-clash-bold text-lg">
+                  <Text className="text-white font-satoshi-bold text-lg">
                     Continue
                   </Text>
                 )}
@@ -176,9 +175,7 @@ export default function KYCScreen() {
                 className="mt-4 items-center"
                 onPress={() => router.back()}
               >
-                <Text className="text-purple-500 font-clash-semibold">
-                  Back
-                </Text>
+                <Text className="text-purple-500 font-satoshi-bold">Back</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>

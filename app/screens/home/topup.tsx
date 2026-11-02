@@ -1,3 +1,4 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +10,6 @@ import {
   Platform,
   ScrollView,
   Share,
-  Text,
   ToastAndroid,
   TouchableOpacity,
   View,
@@ -49,8 +49,10 @@ export default function TopUpScreen() {
         >
           <Ionicons name="arrow-back" size={18} color="#000" />
         </TouchableOpacity>
-        <Text className="text-3xl font-clash-bold text-black mb-4">Top up</Text>
-        <Text className="text-grey-500 font-clash-regular text-sm mb-8">
+        <Text className="text-3xl font-satoshi-bold text-black mb-4">
+          Top up
+        </Text>
+        <Text className="text-grey-500 font-satoshi-regular text-sm mb-8">
           Send funds from any Nigerian bank to your PayDrop wallet.
         </Text>
 
@@ -58,13 +60,13 @@ export default function TopUpScreen() {
           onPress={handleCopy}
           className="bg-grey-50 rounded-3xl p-6 mb-5 border border-grey-100"
         >
-          <Text className="text-grey-500 font-clash-medium text-sm mb-2">
+          <Text className="text-grey-500 font-satoshi-medium text-sm mb-2">
             Account number
           </Text>
-          <Text className="text-black font-clash-semibold text-3xl mb-2">
+          <Text className="text-black font-satoshi-bold text-3xl mb-2">
             {accountNumber}
           </Text>
-          <Text className="text-grey-500 font-clash-regular text-sm">
+          <Text className="text-grey-500 font-satoshi-regular text-sm">
             Tap to copy
           </Text>
         </TouchableOpacity>
@@ -82,7 +84,7 @@ export default function TopUpScreen() {
           onPress={handleShare}
           className="bg-purple-500 rounded-3xl py-4 items-center"
         >
-          <Text className="text-white font-clash-semibold text-base">
+          <Text className="text-white font-satoshi-bold text-base">
             Share details
           </Text>
         </TouchableOpacity>
@@ -94,10 +96,10 @@ export default function TopUpScreen() {
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <View className="mb-4">
-      <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+      <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
         {label}
       </Text>
-      <Text className="text-black font-clash-semibold text-base">{value}</Text>
+      <Text className="text-black font-satoshi-bold text-base">{value}</Text>
     </View>
   );
 }

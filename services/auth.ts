@@ -8,7 +8,6 @@ export const requestOtp = async (intent: string, phone: string) => {
     });
     return response.data;
   } catch (error: any) {
-    console.log(error);
     throw error.response?.data || error.message;
   }
 };
@@ -18,7 +17,6 @@ export const verifyOtp = async (data: any) => {
     const response = await api.post("/auth/verify-otp", data);
     return response.data;
   } catch (error: any) {
-    console.log(error);
     throw error.response?.data;
   }
 };

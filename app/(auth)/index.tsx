@@ -1,4 +1,5 @@
 import ScreenView from "@/components/layout/ScreenView";
+import { Text } from "@/components/shared";
 import { COLORS } from "@/config/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -8,7 +9,6 @@ import {
   FlatList,
   Image,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -46,7 +46,7 @@ export default function OnboardingScreen() {
 
   const handleStartAuth = () => {
     setHasSeenIntro(true);
-    router.replace("/(auth)/register");
+    router.replace("/(auth)/login");
   };
 
   const handleNext = () => {
@@ -73,10 +73,10 @@ export default function OnboardingScreen() {
           color={COLORS.purple[500]}
         />
       </View>
-      <Text className="text-3xl font-clash-semibold text-black text-center mb-4">
+      <Text className="text-3xl font-satoshi-bold text-black text-center mb-4">
         {item.title}
       </Text>
-      <Text className="text-base font-clash-regular text-grey-500 text-center leading-6 px-4">
+      <Text className="text-base font-satoshi-regular text-grey-500 text-center leading-6 px-4">
         {item.subtitle}
       </Text>
     </View>
@@ -96,7 +96,7 @@ export default function OnboardingScreen() {
         <View className="flex-row justify-end pt-4 px-6 h-24">
           {currentIndex < slides.length - 1 ? (
             <TouchableOpacity onPress={handleStartAuth} className="py-2 px-4">
-              <Text className="text-base font-clash-semibold text-purple-500">
+              <Text className="text-base font-satoshi-bold text-purple-500">
                 Skip
               </Text>
             </TouchableOpacity>
@@ -139,7 +139,7 @@ export default function OnboardingScreen() {
               className="bg-purple-500 h-16 rounded-2xl justify-center items-center"
               onPress={handleStartAuth}
             >
-              <Text className="text-white font-clash-bold text-lg">
+              <Text className="text-white font-satoshi-bold text-lg">
                 Get Started
               </Text>
             </TouchableOpacity>
@@ -148,7 +148,7 @@ export default function OnboardingScreen() {
               className="bg-purple-500 h-16 rounded-2xl justify-center items-center"
               onPress={handleNext}
             >
-              <Text className="text-white font-clash-bold text-lg">
+              <Text className="text-white font-satoshi-bold text-lg">
                 Continue
               </Text>
             </TouchableOpacity>

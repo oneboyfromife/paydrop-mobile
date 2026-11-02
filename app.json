@@ -21,13 +21,7 @@
         "NSBluetoothAlwaysUsageDescription": "PayDrop uses Bluetooth to find nearby users for seamless payments.",
         "NSBluetoothPeripheralUsageDescription": "PayDrop uses Bluetooth to make your device discoverable to nearby users.",
         "NSCameraUsageDescription": "PayDrop needs access to your camera to scan QR codes and take photos.",
-        "NSMicrophoneUsageDescription": "PayDrop needs access to your microphone for video features.",
-        "UIBackgroundModes": [
-          "bluetooth-central",
-          "bluetooth-peripheral",
-          "bluetooth-central",
-          "bluetooth-peripheral"
-        ]
+        "NSMicrophoneUsageDescription": "PayDrop needs access to your microphone for video features."
       },
       "bundleIdentifier": "com.paydrop.paydrop"
     },
@@ -47,14 +41,6 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_SCAN",
-        "android.permission.BLUETOOTH_ADVERTISE",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN"
       ],
       "package": "com.paydrop.paydrop"
@@ -66,12 +52,13 @@
     },
     "plugins": [
       "./plugins/withBleAdvertiser.js",
+
       "expo-router",
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
+          "isBackgroundEnabled": false,
+          "modes": [],
           "bluetoothAlwaysPermission": "Allow PayDrop to use Bluetooth to find nearby users."
         }
       ],
@@ -106,6 +93,14 @@
         "projectId": "7047b5c0-9a0c-47d7-a3a2-15ddfdb30ba8"
       }
     },
-    "owner": "victorfaruna"
+    "owner": "victorfaruna",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7047b5c0-9a0c-47d7-a3a2-15ddfdb30ba8",
+      "fallbackToCacheTimeout": 0,
+      "enabled": true
+    }
   }
 }

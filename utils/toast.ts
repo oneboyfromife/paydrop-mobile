@@ -1,27 +1,21 @@
-import { toast } from "sonner-native";
+import { Alert } from "react-native";
 
 export const showToast = {
   success: (message: string, description?: string) => {
-    toast.success(message, {
-      description,
-    });
+    Alert.alert(message, description);
   },
   error: (message: string, description?: string) => {
-    toast.error(message, {
-      description,
-    });
+    Alert.alert(message, description);
   },
   info: (message: string, description?: string) => {
-    toast(message, {
-      description,
-    });
+    Alert.alert(message, description);
   },
   loading: (message: string, description?: string) => {
-    return toast.loading(message, {
-      description,
-    });
+    // Alert doesn't have a loading state, we just show the message
+    console.log("Loading toast:", message, description);
+    return "loading-id";
   },
   dismiss: (id?: string | number) => {
-    toast.dismiss(id);
+    // No-op for Alert
   },
 };

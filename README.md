@@ -10,7 +10,7 @@
 - **Secure Authentication**: Robust phone number verification with a 6-digit OTP system.
 - **Modern Fintech Dashboard**: A comprehensive home screen featuring real-time balance tracking, quick actions, and detailed transaction history.
 - **Seamless UX**: Smooth transitions and micro-animations powered by React Native Reanimated.
-- **Custom Design System**: Utilizing **Clash Display** typography and a tailored color palette for a premium brand feel.
+- **Custom Design System**: Utilizing **Satoshi** typography and a tailored color palette for a premium brand feel.
 
 ## 🛠 Tech Stack
 
@@ -43,8 +43,8 @@ store/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Expo Go](https://expo.dev/go) app on your mobile device or an emulator (iOS/Android)
+- [Node.js](https://nodejs.org/) (v20.19 or later; automated checks were run with Node 24)
+- A custom Expo development build on a physical iPhone or Android device for BLE (Expo Go does not support this feature)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 
 ### Installation
@@ -70,14 +70,18 @@ Start the development server with a clean cache:
 npx expo start -c
 ```
 
-Open the app on your device by scanning the QR code with Expo Go, or press `i` for iOS simulator / `a` for Android emulator.
+Open a custom development build with `npx expo start --dev-client`. BLE testing requires physical devices and a fresh native binary; use the `development-device` EAS profile for hardware builds.
 
 ## 🎨 Design Principles
 
 - **No Unnecessary Shadows**: Utilizing flat design with thin borders and color variations for depth.
-- **Premium Typography**: Extensive use of **Clash Display** for a sophisticated fintech look.
+- **Premium Typography**: **Satoshi** is the default for app text and inputs. Use `Text` and `TextInput` from `@/components/shared`; choose `font-satoshi-medium` or `font-satoshi-bold` when a different weight is needed.
 - **Responsive Layouts**: Flexible designs that adapt across various screen sizes.
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## BLE social transfers
+
+See [the architecture and staging contract guide](docs/ble-transfer-architecture.md) for lifecycle ownership, payment recovery, secure credential migration, public configuration and the device validation matrix. New financial submissions stay disabled until `EXPO_PUBLIC_TRANSFER_CONTRACT_CONFIRMED=true` is explicitly configured after staging validation.

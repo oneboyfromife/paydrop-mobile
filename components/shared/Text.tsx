@@ -1,4 +1,4 @@
-import { COLORS } from "@/config/colors";
+import { defaultFontClassName } from "@/config/fonts";
 import { Text as DefaultText, useColorScheme } from "react-native";
 
 type TextProps = DefaultText["props"] & {
@@ -7,15 +7,14 @@ type TextProps = DefaultText["props"] & {
 };
 
 export function Text(props: TextProps) {
-  const { style, lightColor, darkColor, ...otherProps } = props;
+  const { style, className, lightColor, darkColor, ...otherProps } = props;
   const theme = useColorScheme() ?? "light";
   const color = theme === "light" ? lightColor : darkColor;
 
-  const defaultColor = COLORS.black;
-
   return (
     <DefaultText
-      style={[{ color: color || defaultColor }, style]}
+      className={defaultFontClassName(className)}
+      style={[color ? { color } : undefined, style]}
       {...otherProps}
     />
   );

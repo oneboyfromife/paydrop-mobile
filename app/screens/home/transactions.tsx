@@ -1,14 +1,17 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import FraudDetailModal from "@/components/sections/FraudDetailModal";
 import api from "@/services/api";
 import { useUserStore } from "@/store/userStore";
 import { koboToNaira } from "@/utils/currency";
-import { useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   FlatList,
   RefreshControl,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -34,74 +37,43 @@ type FilterType = (typeof FILTERS)[number];
 
 export default function TransactionsScreen() {
   const accessToken = useUserStore((state) => state.accessToken);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const accountId = useUserStore((state) => state.user?.id);
   const [filter, setFilter] = useState<FilterType>("All");
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [isFraudModalVisible, setIsFraudModalVisible] = useState(false);
-
-  const fetchTransactions = async (pageNumber = 1, append = false) => {
-    if (pageNumber === 0) {
-      setLoading(true);
-      setError(null);
-    } else {
-      setLoadingMore(true);
-    }
-
-    try {
-      if (!accessToken) {
-        setTransactions([]);
-        setHasMore(false);
-        return;
-      }
-
+  const query = useInfiniteQuery({
+    queryKey: ["transactions", accountId, "history"],
+    enabled: !!accessToken,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam, signal }) => {
       const response = await api.get("/transactions", {
-        params: {
-          page: pageNumber,
-          limit: 10,
-        },
+        params: { page: pageParam, limit: 10 },
+        signal,
       });
-
-      const fetched: Transaction[] = response.data.transactions ?? [];
-      setTransactions((current) =>
-        append ? [...current, ...fetched] : fetched,
-      );
-      setHasMore(fetched.length >= 20);
-    } catch (fetchError: any) {
-      console.error("Transactions screen fetch error", fetchError);
-      setError(
-        fetchError.response?.data?.message ||
-          fetchError.message ||
-          "Could not load transactions.",
-      );
-      setHasMore(false);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
+      const body = response.data?.data ?? response.data;
+      return (
+        Array.isArray(body?.transactions) ? body.transactions : []
+      ) as Transaction[];
+    },
+    getNextPageParam: (lastPage, pages) =>
+      lastPage.length >= 10 ? pages.length : undefined,
+  });
+  const transactions = useMemo(() => {
+    const byId = new Map<string, Transaction>();
+    query.data?.pages
+      .flat()
+      .forEach((transaction) => byId.set(transaction.id, transaction));
+    return [...byId.values()];
+  }, [query.data]);
+  const loading = query.isLoading;
+  const loadingMore = query.isFetchingNextPage;
+  const refreshing = query.isRefetching && !loadingMore;
+  const hasMore = query.hasNextPage;
+  const handleRefresh = () => {
+    void query.refetch();
   };
-
-  useEffect(() => {
-    fetchTransactions(0, false);
-  }, [accessToken]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setPage(0);
-    await fetchTransactions(0, false);
-    setRefreshing(false);
-  };
-
-  const loadMore = async () => {
-    if (!hasMore || loadingMore || loading) return;
-    const nextPage = page + 1;
-    setPage(nextPage);
-    await fetchTransactions(nextPage, true);
+  const loadMore = () => {
+    if (hasMore && !query.isFetching) void query.fetchNextPage();
   };
 
   const filteredTransactions = useMemo(() => {
@@ -137,32 +109,32 @@ export default function TransactionsScreen() {
         <View className="flex-row justify-between items-start mb-3 gap-3">
           <View className="flex-1 min-w-0">
             <Text
-              className="text-black font-clash-semibold text-base"
+              className="text-black font-satoshi-bold text-base"
               numberOfLines={2}
             >
               {item.squad_ref}
             </Text>
             <Text
-              className="text-grey-500 font-clash-regular text-xs mt-1"
+              className="text-grey-500 font-satoshi-regular text-xs mt-1"
               numberOfLines={2}
             >
-              {item.fraud_verdict.toUpperCase()} • {date}
+              {(item.fraud_verdict || "Unavailable").toUpperCase()} • {date}
             </Text>
           </View>
           <Text
-            className={`font-clash-semibold text-base shrink-0 ${direction === "up" ? "text-green-600" : "text-red-600"}`}
+            className={`font-satoshi-bold text-base shrink-0 ${direction === "up" ? "text-green-600" : "text-red-600"}`}
           >
             {amountLabel}
           </Text>
         </View>
         <View className="flex-row justify-between items-center">
           <View className="bg-grey-100 rounded-full px-3 py-1">
-            <Text className="text-grey-500 font-clash-medium text-xs">
+            <Text className="text-grey-500 font-satoshi-medium text-xs">
               {item.status}
             </Text>
           </View>
           <View className="bg-purple-50 rounded-full px-3 py-1">
-            <Text className="text-purple-700 font-clash-medium text-xs">
+            <Text className="text-purple-700 font-satoshi-medium text-xs">
               {item.fraud_score} score
             </Text>
           </View>
@@ -174,14 +146,20 @@ export default function TransactionsScreen() {
   return (
     <ScreenView>
       <View className="flex-1 bg-white px-6 pt-4">
-        <Text className="text-3xl font-clash-semibold text-black mb-3">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="w-12 h-12 bg-grey-50 rounded-full items-center justify-center mb-8 border border-grey-100"
+        >
+          <Ionicons name="arrow-back" size={18} color="#000" />
+        </TouchableOpacity>
+        <Text className="text-3xl font-satoshi-bold text-black mb-3">
           Transactions
         </Text>
-        <Text className="text-grey-500 font-clash-regular text-sm mb-6">
+        <Text className="text-grey-500 font-satoshi-regular text-sm mb-6">
           View your history and filter by sent or received activity.
         </Text>
 
-        <View className="flex-row justify-between mb-6">
+        <View className="flex-row gap-4 mb-6">
           {FILTERS.map((option) => (
             <TouchableOpacity
               key={option}
@@ -193,7 +171,7 @@ export default function TransactionsScreen() {
               }`}
             >
               <Text
-                className={`text-sm font-clash-medium ${filter === option ? "text-white" : "text-grey-600"}`}
+                className={`text-sm font-satoshi-medium ${filter === option ? "text-white" : "text-grey-600"}`}
               >
                 {option}
               </Text>
@@ -220,8 +198,10 @@ export default function TransactionsScreen() {
             }
             ListEmptyComponent={() => (
               <View className="items-center mt-16">
-                <Text className="text-grey-500 font-clash-regular text-base">
-                  No transactions found for this filter.
+                <Text className="text-grey-500 font-satoshi-regular text-base">
+                  {query.error
+                    ? "Unable to load transactions. Pull to retry."
+                    : "No transactions found for this filter."}
                 </Text>
               </View>
             )}
@@ -232,7 +212,7 @@ export default function TransactionsScreen() {
                   className="bg-purple-500 rounded-3xl py-4 items-center mt-4"
                   disabled={loadingMore}
                 >
-                  <Text className="text-white font-clash-medium text-base">
+                  <Text className="text-white font-satoshi-medium text-base">
                     {loadingMore ? "Loading more..." : "Load more"}
                   </Text>
                 </TouchableOpacity>

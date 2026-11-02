@@ -1,163 +1,113 @@
-import api from "@/services/api";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useUserStore } from "@/store/userStore";
+import { Text } from "@/components/shared";
+import ScreenView from "@/components/layout/ScreenView";
+import { confirmFlaggedTransfer, recoverTransfer } from "@/services/transfers";
+import { useTransferStore } from "@/store/transferStore";
 import { koboToNaira } from "@/utils/currency";
-
-
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 
 export default function FlagWarningScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{
-    confirmToken: string;
-    fraudReason: string;
-    fraudScore: string;
-    recipientName: string;
-    amount: string;
-    expiresAt: string;
-  }>();
-
-  const accessToken = useUserStore((state) => state.accessToken);
-  const [timeLeft, setTimeLeft] = useState("");
-  const [processing, setProcessing] = useState(false);
-
+  const intent = useTransferStore((state) => state.active);
+  const [now, setNow] = useState(Date.now());
+  const [error, setError] = useState<string | null>(null);
+  const locked = useRef(false);
   useEffect(() => {
-    const expiry = new Date(params.expiresAt).getTime();
-    
-    const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const diff = expiry - now;
-      
-      if (diff <= 0) {
-        setTimeLeft("00:00");
-        clearInterval(interval);
-      } else {
-        const minutes = Math.floor(diff / 60000);
-        const seconds = Math.floor((diff % 60000) / 1000);
-        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [params.expiresAt]);
-
-  const handleProceed = async () => {
-    setProcessing(true);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const flag = intent?.flag;
+  const expiresIn = flag
+    ? Math.max(0, Math.ceil((flag.expiresAt - now) / 1000))
+    : 0;
+  const processing = intent?.phase === "submitting";
+  const proceed = async () => {
+    if (locked.current || processing || !expiresIn) return;
+    locked.current = true;
     try {
-      await api.post(
-        "/transactions/transfer/confirm",
-        { confirm_token: params.confirmToken }
+      await confirmFlaggedTransfer();
+      const active = useTransferStore.getState().active;
+      if (active?.phase === "flagged") {
+        setError(active.message || "Unable to confirm. Please retry.");
+        return;
+      }
+      router.replace("/screens/payment/payment-result");
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Unable to confirm payment.",
       );
-
-      router.push({
-        pathname: "/screens/payment/payment-result" as any,
-        params: {
-          success: "true",
-          amount: params.amount,
-          recipientName: params.recipientName,
-        },
-      });
-    } catch (error: any) {
-      console.error("Confirm error", error);
-      router.push({
-        pathname: "/screens/payment/payment-result" as any,
-        params: {
-          success: "false",
-          error: error.response?.data?.message || "Confirmation failed",
-          amount: params.amount,
-          recipientName: params.recipientName,
-        },
-      });
     } finally {
-      setProcessing(false);
+      locked.current = false;
     }
   };
-
-  const score = parseInt(params.fraudScore);
-  const getScoreColor = (s: number) => {
-    if (s <= 39) return "#00D68F";
-    if (s <= 69) return "#FFB347";
-    return "#FF6B6B";
-  };
-
   return (
-    <View className="flex-1 bg-white px-6 pt-[60px]">
-      <View className="items-center mb-10">
-        <View className="w-[60px] h-[60px] rounded-full bg-[#FFB347]/20 items-center justify-center mb-6">
-          <Text style={{ fontSize: 32 }}>⚠️</Text>
-        </View>
-        <Text className="text-[#1A1A1A] font-clash-bold text-[22px] text-center mb-2">
-          Proceed with Caution
+    <ScreenView>
+      <View className="flex-1 bg-white px-6 pt-8">
+        <Text className="text-center text-3xl mb-6">⚠️</Text>
+        <Text className="font-satoshi-bold text-2xl text-center mb-4">
+          Review this payment
         </Text>
-        <Text className="text-[#6B7280] font-clash-regular text-[14px] text-center px-4">
-          This transaction was flagged by our fraud system.
-        </Text>
-      </View>
-
-      <View className="bg-[#F3F4F6] rounded-[16px] p-[20px] mb-8">
-        <Text className="text-[#1A1A1A] font-clash-regular text-[14px] mb-4">
-          {params.fraudReason || "Unusual transaction pattern detected."}
-        </Text>
-        
-        <View className="flex-row justify-between items-center mb-3">
-          <Text className="text-[#6B7280] font-clash-medium text-[13px]">
-            Risk Score:
+        <View className="bg-grey-50 rounded-2xl p-5 mb-6">
+          <Text className="mb-4">
+            {flag?.reason ||
+              "Check the current payment status before proceeding."}
           </Text>
-          <Text 
-            style={{ color: getScoreColor(score) }}
-            className="font-clash-bold text-[14px]"
-          >
-            {score} / 100
-          </Text>
-        </View>
-
-        <View className="h-[1px] bg-[#D1D5DB] my-3" />
-
-        <View className="flex-row justify-between items-center">
-          <Text className="text-[#1A1A1A] font-clash-bold text-[16px]">
-            {koboToNaira(parseInt(params.amount))}
-          </Text>
-          <Text className="text-[#6B7280] font-clash-medium text-[13px]">
-            to @{params.recipientName.replace(/\s+/g, '').toLowerCase()}
-          </Text>
-        </View>
-      </View>
-
-      <View className="items-center mb-10">
-        <Text className="text-[#FFB347] font-clash-medium text-[14px]">
-          This approval expires in {timeLeft}
-        </Text>
-      </View>
-
-      <View className="flex-1 justify-end pb-12">
-        <TouchableOpacity
-          onPress={handleProceed}
-          disabled={processing}
-          className="bg-[#FFB347] h-[52px] rounded-full items-center justify-center w-full mb-4"
-        >
-          {processing ? (
-            <ActivityIndicator color="black" />
-          ) : (
-            <Text className="text-black font-clash-bold text-[16px]">
-              Proceed Anyway
+          {flag?.score !== null && flag?.score !== undefined && (
+            <Text className="text-grey-500 mb-3">
+              Server risk score: {flag.score} / 100
             </Text>
           )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="bg-[#F3F4F6] border border-black/10 h-[52px] rounded-full items-center justify-center w-full"
-        >
-          <Text className="text-[#1A1A1A] font-clash-bold text-[16px]">
-            Cancel Transfer
+          {intent?.amount !== null && intent?.amount !== undefined && (
+            <Text className="font-satoshi-bold text-xl">
+              {koboToNaira(intent.amount)}
+            </Text>
+          )}
+          <Text className="mt-2">
+            {intent?.recipient
+              ? `${intent.recipient.first_name} ${intent.recipient.last_name}`
+              : "Pending payment"}
           </Text>
-        </TouchableOpacity>
+        </View>
+        <Text className="text-center text-grey-500">
+          {expiresIn
+            ? `Approval expires in ${Math.floor(expiresIn / 60)}:${String(expiresIn % 60).padStart(2, "0")}`
+            : "Approval expired. Check payment status."}
+        </Text>
+        {error && <Text className="text-red-500 mt-4">{error}</Text>}
+        <View className="flex-1 justify-end pb-12">
+          <TouchableOpacity
+            onPress={proceed}
+            disabled={processing || !expiresIn || intent?.phase !== "flagged"}
+            className="bg-orange-300 rounded-full items-center py-4 mb-4"
+            style={{ opacity: expiresIn ? 1 : 0.5 }}
+          >
+            {processing ? (
+              <ActivityIndicator />
+            ) : (
+              <Text className="font-satoshi-bold">Confirm and proceed</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              void recoverTransfer();
+              router.replace("/screens/payment/payment-result");
+            }}
+            className="p-4"
+          >
+            <Text className="text-center text-purple-500">
+              Check payment status
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            disabled={processing}
+            onPress={() => router.replace("/(tabs)/home")}
+            className="p-4"
+          >
+            <Text className="text-center text-grey-500">Check later</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ScreenView>
   );
 }

@@ -1,4 +1,9 @@
 import api from "./api";
+import type { DiscoveryAuth } from "./bleDiscovery";
+import type { DiscoveryRegistration, Resolution } from "../types/discovery";
+import { readExpiresAt } from "../utils/apiPayload";
+import { resolvedProfiles } from "../utils/discoveryProfile";
+import { useUserStore } from "../store/userStore";
 
 export const getMe = async () => {
   try {
@@ -14,7 +19,6 @@ export const getWalletBalance = async () => {
     const response = await api.get("/wallet/balance");
     return response.data;
   } catch (error: any) {
-    console.log("ERROR!", error);
     throw error.response?.data || error.message;
   }
 };
@@ -30,74 +34,54 @@ export const getTransactions = async (page = 1, limit = 10) => {
   }
 };
 
-export const getQrCode = async () => {
+export const getQrCode = async (signal?: AbortSignal) => {
   try {
-    const response = await api.get("/discover/qr");
+    const response = await api.get("/discover/qr", { signal });
     return response.data;
   } catch (error: any) {
     throw error.response?.data || error.message;
   }
 };
 
-export const broadcastDiscovery = async ({ token }: { token: string }) => {
-  try {
-    const response = await api.post("/discover/broadcast", { token });
-    return response.data;
-  } catch (error: any) {
-    throw error.response?.data || error.message;
-  }
+export const broadcastDiscovery = async (
+  { token }: { token: string },
+  auth: DiscoveryAuth,
+): Promise<DiscoveryRegistration> => {
+  const response = await api.post(
+    "/discover/broadcast",
+    { token },
+    {
+      headers: { Authorization: `Bearer ${auth.accessToken}` },
+    },
+  );
+  const expiresAt = readExpiresAt(response.data);
+  if (expiresAt === null)
+    throw new Error("Bluetooth session expiry unavailable. Use QR or retry.");
+  return { expiresAt };
 };
 
-export const stopDiscoveryBroadcast = async () => {
-  try {
-    const response = await api.delete("/discover/broadcast");
-    return response.data;
-  } catch (error: any) {
-    throw error.response?.data || error.message;
-  }
+export const stopDiscoveryBroadcast = async (auth: DiscoveryAuth) => {
+  const current = useUserStore.getState();
+  const accessToken =
+    current.user?.id === auth.accountId && current.accessToken
+      ? current.accessToken
+      : auth.accessToken;
+  await api.delete("/discover/broadcast", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 };
 
 /** Backend expects `{ token }` (singular), not `{ tokens: [] }`. */
-export const resolveDiscoveryToken = async (token: string) => {
+export const resolveDiscoveryToken = async (
+  token: string,
+  signal?: AbortSignal,
+) => {
   try {
-    const response = await api.post("/discover/resolve", { token });
+    const response = await api.post("/discover/resolve", { token }, { signal });
     return response.data;
   } catch (error: any) {
     throw error.response?.data || error.message;
   }
-};
-
-export const resolveDiscoveryTokens = async (tokens: string[]) => {
-  const unique = [...new Set(tokens.map((t) => t.trim()).filter(Boolean))];
-  const users: Record<string, unknown>[] = [];
-
-  for (const token of unique) {
-    try {
-      const data = await resolveDiscoveryToken(token);
-      if (data?.user && data.user.id) {
-        if (!users.some((u) => u.id === data.user.id)) {
-          users.push(data.user);
-        }
-        continue;
-      }
-      const list = Array.isArray(data)
-        ? data
-        : data?.users || data?.resolved || data?.data;
-      if (Array.isArray(list)) {
-        list.forEach((user: { id?: string }) => {
-          if (user?.id && !users.some((u) => u.id === user.id)) {
-            users.push(user);
-          }
-        });
-      }
-    } catch (err) {
-      console.warn("[Discover] Failed to resolve token:", token, err);
-    }
-  }
-
-  if (users.length === 1) return { user: users[0] };
-  if (users.length > 1) return { users };
-  return { users: [] };
 };
 
 export const getFraudDetail = async (id: string) => {
@@ -106,6 +90,23 @@ export const getFraudDetail = async (id: string) => {
     return response.data;
   } catch (error: any) {
     throw error.response?.data || error.message;
+  }
+};
+
+export const resolveObservedToken = async (
+  token: string,
+  signal: AbortSignal,
+): Promise<Resolution> => {
+  try {
+    const response = await api.post("/discover/resolve", { token }, { signal });
+    const user = resolvedProfiles(response.data)[0];
+    return user ? { kind: "resolved", user } : { kind: "invalid" };
+  } catch (error: unknown) {
+    const status = (error as { response?: { status?: number } }).response
+      ?.status;
+    return status === 404 || status === 410
+      ? { kind: "invalid" }
+      : { kind: "retry" };
   }
 };
 

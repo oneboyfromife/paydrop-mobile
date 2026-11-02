@@ -1,14 +1,8 @@
+import { Text, TextInput } from "@/components/shared";
 import { COLORS } from "@/config/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo, useState } from "react";
-import {
-  Alert,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, ScrollView, TouchableOpacity, View } from "react-native";
 
 interface Bank {
   code: string;
@@ -95,10 +89,10 @@ export default function TransferScreen() {
       className="flex-1 bg-white px-6 pt-14"
       showsVerticalScrollIndicator={false}
     >
-      <Text className="text-3xl font-clash-bold text-black mb-4">
+      <Text className="text-3xl font-satoshi-bold text-black mb-4">
         Send money
       </Text>
-      <Text className="text-grey-500 font-clash-regular text-sm mb-6">
+      <Text className="text-grey-500 font-satoshi-regular text-sm mb-6">
         Send to a PayDrop user or transfer directly to another bank.
       </Text>
 
@@ -111,7 +105,7 @@ export default function TransferScreen() {
           className={`flex-1 py-3 rounded-full items-center ${activeTab === "paydrop" ? "bg-white" : "bg-transparent"}`}
         >
           <Text
-            className={`font-clash-semibold text-sm ${activeTab === "paydrop" ? "text-black" : "text-grey-500"}`}
+            className={`font-satoshi-bold text-sm ${activeTab === "paydrop" ? "text-black" : "text-grey-500"}`}
           >
             PayDrop user
           </Text>
@@ -124,7 +118,7 @@ export default function TransferScreen() {
           className={`flex-1 py-3 rounded-full items-center ${activeTab === "bank" ? "bg-white" : "bg-transparent"}`}
         >
           <Text
-            className={`font-clash-semibold text-sm ${activeTab === "bank" ? "text-black" : "text-grey-500"}`}
+            className={`font-satoshi-bold text-sm ${activeTab === "bank" ? "text-black" : "text-grey-500"}`}
           >
             Other bank
           </Text>
@@ -147,7 +141,7 @@ export default function TransferScreen() {
                 : "Search bank name or code"
             }
             placeholderTextColor="#9CA3AF"
-            className="ml-3 flex-1 text-sm font-clash-regular text-black"
+            className="ml-3 flex-1 text-sm font-satoshi-regular text-black"
           />
         </View>
 
@@ -158,10 +152,10 @@ export default function TransferScreen() {
                 onPress={() => setSelectedUser(user)}
                 className={`p-4 rounded-3xl mb-3 border ${selectedUser?.id === user.id ? "border-purple-500 bg-purple-50" : "border-grey-100 bg-white"}`}
               >
-                <Text className="text-black font-clash-semibold">
+                <Text className="text-black font-satoshi-bold">
                   {user.name}
                 </Text>
-                <Text className="text-grey-500 font-clash-regular text-xs mt-1">
+                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
                   {user.username}
                 </Text>
               </TouchableOpacity>
@@ -172,10 +166,10 @@ export default function TransferScreen() {
                 onPress={() => setSelectedBank(bank)}
                 className={`p-4 rounded-3xl mb-3 border ${selectedBank.code === bank.code ? "border-purple-500 bg-purple-50" : "border-grey-100 bg-white"}`}
               >
-                <Text className="text-black font-clash-semibold">
+                <Text className="text-black font-satoshi-bold">
                   {bank.name}
                 </Text>
-                <Text className="text-grey-500 font-clash-regular text-xs mt-1">
+                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
                   Code {bank.code}
                 </Text>
               </TouchableOpacity>
@@ -184,14 +178,14 @@ export default function TransferScreen() {
 
       {activeTab === "paydrop" ? (
         <View className="bg-grey-50 rounded-3xl p-4 mb-6 border border-grey-100">
-          <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+          <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
             Selected PayDrop user
           </Text>
-          <Text className="text-black font-clash-semibold text-base mb-3">
+          <Text className="text-black font-satoshi-bold text-base mb-3">
             {selectedUser ? selectedUser.name : "No user selected"}
           </Text>
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs">
+            <Text className="text-grey-500 font-satoshi-medium text-xs">
               Amount (NGN)
             </Text>
             <TextInput
@@ -200,11 +194,11 @@ export default function TransferScreen() {
               placeholder="0"
               keyboardType="numeric"
               placeholderTextColor="#9CA3AF"
-              className="text-black text-2xl font-clash-semibold mt-2"
+              className="text-black text-2xl font-satoshi-bold mt-2"
             />
           </View>
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs">
+            <Text className="text-grey-500 font-satoshi-medium text-xs">
               Note (optional)
             </Text>
             <TextInput
@@ -212,7 +206,7 @@ export default function TransferScreen() {
               onChangeText={setNote}
               placeholder="Reason for transfer"
               placeholderTextColor="#9CA3AF"
-              className="text-black text-base font-clash-regular mt-2"
+              className="text-black text-base font-satoshi-regular mt-2"
             />
           </View>
           <TouchableOpacity
@@ -220,7 +214,7 @@ export default function TransferScreen() {
             disabled={!selectedUser || !amount || processing}
             className={`rounded-3xl py-4 items-center ${selectedUser && amount && !processing ? "bg-purple-500" : "bg-grey-300"}`}
           >
-            <Text className="text-white font-clash-semibold text-base">
+            <Text className="text-white font-satoshi-bold text-base">
               {processing ? "Processing..." : "Send"}
             </Text>
           </TouchableOpacity>
@@ -228,18 +222,18 @@ export default function TransferScreen() {
       ) : (
         <View className="bg-grey-50 rounded-3xl p-4 mb-6 border border-grey-100">
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+            <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
               Selected bank
             </Text>
-            <Text className="text-black font-clash-semibold text-base">
+            <Text className="text-black font-satoshi-bold text-base">
               {selectedBank.name}
             </Text>
-            <Text className="text-grey-500 font-clash-regular text-xs">
+            <Text className="text-grey-500 font-satoshi-regular text-xs">
               Code {selectedBank.code}
             </Text>
           </View>
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+            <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
               Account number
             </Text>
             <TextInput
@@ -251,27 +245,27 @@ export default function TransferScreen() {
               keyboardType="number-pad"
               maxLength={10}
               placeholderTextColor="#9CA3AF"
-              className="text-black text-base font-clash-regular"
+              className="text-black text-base font-satoshi-regular"
             />
           </View>
           <TouchableOpacity
             onPress={handleLookup}
             className="bg-purple-500 rounded-3xl py-4 items-center mb-4"
           >
-            <Text className="text-white font-clash-semibold text-base">
+            <Text className="text-white font-satoshi-bold text-base">
               Lookup account name
             </Text>
           </TouchableOpacity>
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+            <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
               Account name
             </Text>
-            <Text className="text-black font-clash-semibold text-base">
+            <Text className="text-black font-satoshi-bold text-base">
               {accountName || "Not available"}
             </Text>
           </View>
           <View className="bg-white rounded-3xl p-4 border border-grey-200 mb-4">
-            <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+            <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
               Amount (NGN)
             </Text>
             <TextInput
@@ -280,10 +274,10 @@ export default function TransferScreen() {
               placeholder="0"
               keyboardType="numeric"
               placeholderTextColor="#9CA3AF"
-              className="text-black text-2xl font-clash-semibold"
+              className="text-black text-2xl font-satoshi-bold"
             />
           </View>
-          <Text className="text-grey-500 font-clash-regular text-xs mb-4">
+          <Text className="text-grey-500 font-satoshi-regular text-xs mb-4">
             Idempotency key generated once per screen.
           </Text>
           <TouchableOpacity
@@ -296,7 +290,7 @@ export default function TransferScreen() {
             }
             className={`rounded-3xl py-4 items-center ${accountName && accountNumber.length === 10 && amount && !processing ? "bg-purple-500" : "bg-grey-300"}`}
           >
-            <Text className="text-white font-clash-semibold text-base">
+            <Text className="text-white font-satoshi-bold text-base">
               {processing ? "Processing..." : "Confirm transfer"}
             </Text>
           </TouchableOpacity>
@@ -304,10 +298,10 @@ export default function TransferScreen() {
       )}
 
       <View className="bg-grey-50 rounded-3xl p-4 border border-grey-100">
-        <Text className="text-grey-500 font-clash-medium text-xs mb-2">
+        <Text className="text-grey-500 font-satoshi-medium text-xs mb-2">
           Idempotency key
         </Text>
-        <Text className="text-black font-clash-regular text-xs break-words">
+        <Text className="text-black font-satoshi-regular text-xs break-words">
           {idempotencyKey}
         </Text>
       </View>

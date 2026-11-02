@@ -1,18 +1,23 @@
+import { Text } from "@/components/shared";
 import FraudDetailModal from "@/components/sections/FraudDetailModal";
 import QRModal from "@/components/sections/QRModal";
 import { getMe, getTransactions, getWalletBalance } from "@/services/user";
 import { useUserStore } from "@/store/userStore";
+import {
+  useTransferStore,
+  hydrateTransferRecovery,
+} from "@/store/transferStore";
+import { isUnresolved } from "@/types/transfer";
 import { formatNaira, koboToNaira } from "@/utils/currency";
 import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -64,6 +69,14 @@ export default function HomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const accessToken = useUserStore((state) => state.accessToken);
+  const accountId = useUserStore(
+    (state) => state.user?.id as string | undefined,
+  );
+  const pendingPayment = useTransferStore(
+    (state) => !!state.active && isUnresolved(state.active.phase),
+  );
+  const recoveryError = useTransferStore((state) => state.recoveryError);
+  const recoveryHydrated = useTransferStore((state) => state.hydrated);
   const [qrVisible, setQrVisible] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
@@ -107,6 +120,10 @@ export default function HomeScreen() {
 
   const user =
     accessToken && userData ? userData?.data || userData : DEFAULT_USER;
+  useEffect(() => {
+    if (user?.id && user.id === accountId)
+      useUserStore.getState().setUser(user);
+  }, [userData, accountId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -171,16 +188,16 @@ export default function HomeScreen() {
           </View>
 
           <View className="items-center mb-8">
-            <Text className="text-purple-200 font-clash-regular text-sm mb-1">
+            <Text className="text-purple-200 font-satoshi-regular text-sm mb-1">
               Wallet Balance
             </Text>
             <View className="flex-row items-baseline">
-              <Text className="text-white font-clash-bold text-4xl">
+              <Text className="text-white font-satoshi-bold text-4xl">
                 {formatNaira(walletBalance)}
               </Text>
             </View>
             <View className="bg-purple-600 px-4 py-1.5 rounded-full mt-4">
-              <Text className="text-white font-clash-medium text-sm">
+              <Text className="text-white font-satoshi-medium text-sm">
                 {user?.squad_virtual_account
                   ? "Account linked"
                   : "No account linked"}
@@ -210,13 +227,13 @@ export default function HomeScreen() {
             // onPress={handleCopyAccountNumber}
             className="bg-white/10 rounded-3xl px-4 py-5"
           >
-            <Text className="text-purple-100 font-clash-medium text-sm mb-2">
+            <Text className="text-purple-100 font-satoshi-medium text-sm mb-2">
               Account Number
             </Text>
-            <Text className="text-white font-clash-semibold text-2xl">
+            <Text className="text-white font-satoshi-bold text-2xl">
               {user?.squad_virtual_account ?? ""}
             </Text>
-            <Text className="text-purple-200 font-clash-regular text-sm mt-1">
+            <Text className="text-purple-200 font-satoshi-regular text-sm mt-1">
               {user?.squad_bank_code
                 ? `GTBank • ${user.squad_bank_code}`
                 : "GTBank"}
@@ -225,15 +242,41 @@ export default function HomeScreen() {
         </View>
 
         <View className="px-6 mt-8">
+          {pendingPayment && (
+            <TouchableOpacity
+              onPress={() => router.push("/screens/payment/payment-result")}
+              className="bg-purple-50 border border-purple-100 rounded-2xl p-4 mb-5"
+            >
+              <Text className="font-satoshi-bold text-purple-500">
+                Payment processing
+              </Text>
+              <Text className="text-grey-500 mt-1">
+                View the original payment status before sending again.
+              </Text>
+            </TouchableOpacity>
+          )}
+          {recoveryError && !recoveryHydrated && (
+            <TouchableOpacity
+              onPress={() => {
+                if (accountId) void hydrateTransferRecovery(accountId);
+              }}
+              className="p-4 mb-4"
+            >
+              <Text className="text-red-500">{recoveryError}</Text>
+              <Text className="text-purple-500 mt-2">
+                Retry secure recovery
+              </Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity className="bg-grey-50 rounded-3xl p-5 flex-row items-center border border-grey-100 mb-6">
             <View className="w-12 h-12 bg-orange-100 rounded-2xl items-center justify-center mr-4">
               <Ionicons name="sparkles-outline" size={24} color="#F97316" />
             </View>
             <View className="flex-1">
-              <Text className="text-black font-clash-semibold text-xl">
+              <Text className="text-black font-satoshi-bold text-xl">
                 Stay on top of payments
               </Text>
-              <Text className="text-grey-500 font-clash-regular text-sm mt-0.5">
+              <Text className="text-grey-500 font-satoshi-regular text-sm mt-0.5">
                 Review recent Naira transactions here.
               </Text>
             </View>
@@ -241,24 +284,24 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-clash-medium text-black">
+            <Text className="text-xl font-satoshi-medium text-black">
               Recent transactions
             </Text>
             <TouchableOpacity
               onPress={() => router.push("/screens/home/transactions")}
             >
-              <Text className="text-grey-400 font-clash-medium text-sm">
+              <Text className="text-grey-400 font-satoshi-medium text-sm">
                 See all
               </Text>
             </TouchableOpacity>
           </View>
 
           {loadingTransactions && !refreshing ? (
-            <Text className="text-grey-500 font-clash-regular text-base">
+            <Text className="text-grey-500 font-satoshi-regular text-base">
               Loading transactions...
             </Text>
           ) : error ? (
-            <Text className="text-red-500 font-clash-regular text-base">
+            <Text className="text-red-500 font-satoshi-regular text-base">
               {typeof error === "object" && error !== null
                 ? (error as any).message ||
                   (error as any).error ||
@@ -266,7 +309,7 @@ export default function HomeScreen() {
                 : String(error)}
             </Text>
           ) : recentTransactions.length === 0 ? (
-            <Text className="text-grey-500 font-clash-regular text-base">
+            <Text className="text-grey-500 font-satoshi-regular text-base">
               No recent transactions yet.
             </Text>
           ) : (
@@ -313,7 +356,7 @@ function ActionItem({
         style={{
           fontSize: size.fontSize(10),
         }}
-        className="text-white font-clash-medium"
+        className="text-white font-satoshi-medium"
       >
         {label}
       </Text>
@@ -359,13 +402,13 @@ function TransactionItem({
           </View>
           <View className="flex-1 min-w-0">
             <Text
-              className="text-black font-clash-semibold text-base"
+              className="text-black font-satoshi-bold text-base"
               numberOfLines={2}
             >
               {transaction.squad_ref}
             </Text>
             <Text
-              className="text-grey-500 font-clash-regular text-xs mt-1"
+              className="text-grey-500 font-satoshi-regular text-xs mt-1"
               numberOfLines={1}
             >
               {transaction.status}
@@ -373,24 +416,24 @@ function TransactionItem({
           </View>
         </View>
         <Text
-          className={`font-clash-semibold text-base shrink-0 ${direction === "up" ? "text-green-600" : "text-red-600"}`}
+          className={`font-satoshi-bold text-base shrink-0 ${direction === "up" ? "text-green-600" : "text-red-600"}`}
         >
           {amountLabel}
         </Text>
       </View>
       {transaction.note ? (
         <Text
-          className="text-grey-500 font-clash-regular text-sm mb-2"
+          className="text-grey-500 font-satoshi-regular text-sm mb-2"
           numberOfLines={2}
         >
           {transaction.note}
         </Text>
       ) : null}
       <View className="flex-row justify-between gap-2">
-        <Text className="text-grey-400 font-clash-regular text-xs shrink">
+        <Text className="text-grey-400 font-satoshi-regular text-xs shrink">
           {date}
         </Text>
-        <Text className="text-grey-400 font-clash-regular text-xs shrink-0">
+        <Text className="text-grey-400 font-satoshi-regular text-xs shrink-0">
           {time}
         </Text>
       </View>

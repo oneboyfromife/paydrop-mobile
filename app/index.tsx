@@ -1,8 +1,9 @@
+import { Text } from "@/components/shared";
 import { useAppState } from "@/store/appState";
 import { useUserStore } from "@/store/userStore";
 import { useRouter } from "expo-router";
 import { useEffect } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -41,10 +42,10 @@ export default function SplashScreen() {
           className="w-48 h-48"
           resizeMode="contain"
         />
-        <Text className="text-white text-4xl font-clash-bold">PayDrop</Text>
+        <Text className="text-white text-4xl font-satoshi-bold">PayDrop</Text>
       </View>
 
-      <Text className="absolute bottom-12 text-white text-base font-clash-medium tracking-widest">
+      <Text className="absolute bottom-12 text-white text-base font-satoshi-medium tracking-widest">
         Trust the Person. Not the Number.
       </Text>
     </View>

@@ -1,15 +1,13 @@
+import { Text } from "@/components/shared";
 import PayDropQRCode from "@/components/sections/PayDropQRCode";
-import { getQrCode } from "@/services/user";
+import { useReceiveQr } from "@/hooks/useReceiveQr";
 import { useUserStore } from "@/store/userStore";
-import { getQrCodeValue } from "@/utils/qrPayload";
-import { useQuery } from "@tanstack/react-query";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   ActivityIndicator,
   Image,
   Modal,
   Share,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -24,65 +22,10 @@ interface QRModalProps {
 }
 
 export default function QRModal({ visible, onClose }: QRModalProps) {
-  const [qrTTL, setQrTTL] = useState<number | null>(null);
   const user = useUserStore((state) => state.user);
-  const accessToken = useUserStore((state) => state.accessToken);
   const insets = useSafeAreaInsets();
-
-  const {
-    data: qrData,
-    isLoading: qrLoading,
-    isRefetching: qrRefreshing,
-    error: qrError,
-    refetch: refreshQrCode,
-  } = useQuery({
-    queryKey: ["qr-code", accessToken],
-    queryFn: getQrCode,
-    enabled: visible && !!accessToken,
-  });
-
-  const qrPayload = getQrCodeValue(qrData) ?? "";
-
-  useEffect(() => {
-    if (visible) {
-      console.log("=== QR Modal Debug ===");
-      console.log("Visible:", visible);
-      console.log("Access Token State:", accessToken ? "Present" : "Missing");
-      console.log("Access Token Value:", accessToken ? `${accessToken.substring(0, 10)}...` : "null");
-      console.log("User in Store:", user ? "Found" : "Missing");
-      console.log("QR Data from API:", qrData);
-      console.log("Resolved QR Payload:", qrPayload);
-      console.log("QR Error:", qrError);
-      console.log("======================");
-    }
-  }, [qrData, visible, accessToken, qrPayload, qrError, user]);
-
-  useEffect(() => {
-    if (qrData) {
-      const ttl =
-        typeof qrData?.ttl === "number"
-          ? qrData.ttl
-          : typeof qrData?.expires_in === "number"
-            ? qrData.expires_in
-            : 60;
-      setQrTTL(ttl);
-    }
-  }, [qrData]);
-
-  useEffect(() => {
-    if (!visible) return;
-    const interval = setInterval(() => {
-      setQrTTL((prev) => (prev !== null ? Math.max(prev - 1, 0) : null));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [visible]);
-
-  useEffect(() => {
-    if (visible && qrTTL !== null && qrTTL <= 10 && !qrRefreshing) {
-      refreshQrCode();
-    }
-  }, [visible, qrTTL, qrRefreshing]);
+  const { qrPayload, qrTTL, qrLoading, qrRefreshing, qrError, refreshQrCode } =
+    useReceiveQr(visible);
 
   const handleShareQr = async () => {
     if (!qrPayload) return;
@@ -91,8 +34,8 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
       await Share.share({
         message: `Pay me on PayDrop: ${qrPayload}`,
       });
-    } catch (error) {
-      console.error("Share error", error);
+    } catch {
+      // Sharing may be cancelled by the native sheet.
     }
   };
 
@@ -127,7 +70,7 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
         >
           <View className="flex-row items-center justify-between mb-8">
             <View className="w-10" />
-            <Text className="text-black font-clash-semibold text-xl">
+            <Text className="text-black font-satoshi-bold text-xl">
               Receive Money
             </Text>
             <TouchableOpacity
@@ -162,13 +105,28 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
                     justifyContent: "center",
                   }}
                 >
-                  <Text className="text-grey-400 font-clash-medium text-center">
-                    Unable to load QR code.{"\n"}Please try again.
+                  <Text className="text-grey-400 font-satoshi-medium text-center">
+                    {qrError
+                      ? (qrError as any).message ||
+                        (qrError as any).error ||
+                        "Failed to load QR"
+                      : "Unable to load QR code."}
+                    {"\n"}Please try again.
                   </Text>
                 </View>
               )}
             </View>
 
+            {qrError && (
+              <TouchableOpacity
+                onPress={() => {
+                  void refreshQrCode();
+                }}
+                className="p-3"
+              >
+                <Text className="text-purple-500">Retry QR code</Text>
+              </TouchableOpacity>
+            )}
             <View className="items-center mt-10">
               <View className="relative">
                 <Image
@@ -180,12 +138,11 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
                   }}
                   className="h-[64px] w-[64px] rounded-full border-2 border-purple-100"
                 />
-                <View className="absolute bottom-2 -right-0 bg-green-500 w-4 h-4 rounded-full border-2 border-white" />
               </View>
-              <Text className="mt-4 text-black font-clash-semibold text-lg">
+              <Text className="mt-4 text-black font-satoshi-bold text-lg">
                 {fullName}
               </Text>
-              <Text className="text-grey-500 font-clash-medium text-[14px] mt-0.5">
+              <Text className="text-grey-500 font-satoshi-medium text-[14px] mt-0.5">
                 {username}
               </Text>
             </View>
@@ -201,7 +158,7 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
                   color="white"
                   className="mr-2"
                 />
-                <Text className="text-white font-clash-semibold text-[16px] ml-2">
+                <Text className="text-white font-satoshi-bold text-[16px] ml-2">
                   Share QR
                 </Text>
               </TouchableOpacity>
@@ -217,7 +174,7 @@ export default function QRModal({ visible, onClose }: QRModalProps) {
             {(qrRefreshing || (qrTTL !== null && qrTTL <= 15)) && (
               <View className="mt-6 flex-row items-center">
                 <ActivityIndicator size="small" color="#9CA3AF" />
-                <Text className="ml-2 text-[#9CA3AF] font-clash-medium text-[12px]">
+                <Text className="ml-2 text-[#9CA3AF] font-satoshi-medium text-[12px]">
                   Refreshing code in {qrTTL}s
                 </Text>
               </View>

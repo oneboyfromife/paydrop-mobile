@@ -10,9 +10,14 @@ export const getQrCodeValue = (qrData: unknown): string | null => {
     record.qr,
     record.payload,
     record.code,
+    record.token,
+    record.discovery_token,
+    record.data,
     (record.data as Record<string, unknown> | undefined)?.qr,
     (record.data as Record<string, unknown> | undefined)?.payload,
     (record.data as Record<string, unknown> | undefined)?.code,
+    (record.data as Record<string, unknown> | undefined)?.token,
+    (record.data as Record<string, unknown> | undefined)?.discovery_token,
   ];
 
   for (const value of candidates) {

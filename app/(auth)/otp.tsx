@@ -1,3 +1,4 @@
+import { Text, TextInput } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import { requestOtp, verifyOtp } from "@/services/auth";
 import { showToast } from "@/utils/toast";
@@ -14,8 +15,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -51,46 +50,44 @@ export default function OTPScreen() {
   const { mutate: verifyMutate, isPending: isVerifying } = useMutation({
     mutationFn: async (data: any) => await verifyOtp(data),
     onSuccess: (data) => {
-      console.log("OTP verify success raw data:", JSON.stringify(data, null, 2));
-      
       // Robust extraction for different API response formats
       const accessToken =
-        data?.access_token || 
-        data?.accessToken || 
-        data?.token || 
-        data?.data?.token || 
+        data?.access_token ||
+        data?.accessToken ||
+        data?.token ||
+        data?.data?.token ||
         data?.data?.accessToken ||
         data?.data?.access_token;
-        
+
       const refreshToken =
-        data?.refresh_token || 
-        data?.refreshToken || 
-        data?.refresh || 
-        data?.data?.refreshToken || 
+        data?.refresh_token ||
+        data?.refreshToken ||
+        data?.refresh ||
+        data?.data?.refreshToken ||
         data?.data?.refresh_token;
 
       const resolvedUser = data?.user || data?.data?.user || data?.data;
 
-      console.log("Extracted Access Token:", accessToken ? "Found (starts with " + accessToken.substring(0, 5) + "...)" : "Not Found");
-      console.log("Extracted User:", resolvedUser ? "Found (" + (resolvedUser.username || resolvedUser.id || "No identifier") + ")" : "Not Found");
-
-      if (accessToken) {
-        setTokens(accessToken, refreshToken ?? null);
-      } else {
-        console.warn("No access token found in OTP verification response!");
+      if (
+        typeof accessToken !== "string" ||
+        typeof resolvedUser?.id !== "string"
+      ) {
+        showToast.error(
+          "Verification Failed",
+          "The server returned an incomplete session. Please try again.",
+        );
+        return;
       }
-
-      if (resolvedUser) {
-        setUser(resolvedUser);
-      } else {
-        console.warn("No user data found in OTP verification response!");
-      }
+      setTokens(
+        accessToken,
+        typeof refreshToken === "string" ? refreshToken : null,
+      );
+      setUser(resolvedUser);
 
       setOnboardingCompleted(true);
       router.replace("/(tabs)/home");
     },
     onError: (error: any) => {
-      console.error("Verification Error:", error);
       showToast.error(
         "Verification Failed",
         error?.message || "Invalid code. Please try again.",
@@ -192,10 +189,10 @@ export default function OTPScreen() {
                 <Ionicons name="arrow-back" size={18} color="#000" />
               </TouchableOpacity>
 
-              <Text className="text-3xl font-clash-semibold text-black mb-2">
+              <Text className="text-3xl font-satoshi-bold text-black mb-2">
                 Verify Code
               </Text>
-              <Text className="text-base font-clash-regular text-grey-500 mb-10 leading-6">
+              <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
                 Enter the 6-digit code sent to your phone number.
               </Text>
 
@@ -211,7 +208,7 @@ export default function OTPScreen() {
                       ref={(ref) => {
                         inputRefs.current[index] = ref;
                       }}
-                      className="text-2xl font-clash-semibold text-black text-center w-full h-full"
+                      className="text-2xl font-satoshi-bold text-black text-center w-full h-full"
                       keyboardType="number-pad"
                       maxLength={1}
                       value={digit}
@@ -230,17 +227,17 @@ export default function OTPScreen() {
                 onPress={handleVerify}
                 disabled={isVerifying}
               >
-                <Text className="text-white font-clash-bold text-lg">
+                <Text className="text-white font-satoshi-bold text-lg">
                   {isVerifying ? "Verifying..." : "Verify & Continue"}
                 </Text>
               </TouchableOpacity>
 
               <View className="flex-row justify-center">
-                <Text className="text-grey-500 font-clash-regular text-base">
+                <Text className="text-grey-500 font-satoshi-regular text-base">
                   Didn't receive the code?{" "}
                 </Text>
                 <TouchableOpacity onPress={handleResend}>
-                  <Text className="text-purple-500 font-clash-semibold text-base">
+                  <Text className="text-purple-500 font-satoshi-bold text-base">
                     Resend
                   </Text>
                 </TouchableOpacity>

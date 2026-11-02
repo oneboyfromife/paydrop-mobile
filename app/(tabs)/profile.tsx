@@ -1,16 +1,10 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import {
-  Alert,
-  Image,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, Image, ScrollView, TouchableOpacity, View } from "react-native";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -78,9 +72,7 @@ export default function ProfileScreen() {
       >
         {/* Header */}
         <View className="bg-white px-6 pt-4 pb-4">
-          <Text className="text-black font-clash-semibold text-2xl">
-            Profile
-          </Text>
+          <Text className="text-black font-satoshi-bold text-2xl">Profile</Text>
         </View>
 
         {/* Profile Card */}
@@ -94,7 +86,7 @@ export default function ProfileScreen() {
                     className="w-24 h-24 rounded-full"
                   />
                 ) : (
-                  <Text className="text-purple-600 font-clash-medium text-3xl">
+                  <Text className="text-purple-600 font-satoshi-medium text-3xl">
                     {fullName
                       .split(" ")
                       .map((n) => n[0])
@@ -107,10 +99,10 @@ export default function ProfileScreen() {
                 <Ionicons name="camera" size={16} color="white" />
               </View>
             </TouchableOpacity>
-            <Text className="text-black font-clash-semibold text-2xl mb-1">
+            <Text className="text-black font-satoshi-bold text-2xl mb-1">
               {fullName}
             </Text>
-            <Text className="text-grey-500 font-clash-regular text-base mb-4">
+            <Text className="text-grey-500 font-satoshi-regular text-base mb-4">
               @{username}
             </Text>
           </View>
@@ -118,11 +110,11 @@ export default function ProfileScreen() {
           {/* Trust Score with Progress Bar */}
           <View className="bg-grey-50 rounded-2xl p-4 mb-4">
             <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-black font-clash-semibold text-base">
+              <Text className="text-black font-satoshi-bold text-base">
                 Trust Score
               </Text>
               <View className="bg-green-100 rounded-full px-3 py-1">
-                <Text className="text-green-600 font-clash-medium text-sm">
+                <Text className="text-green-600 font-satoshi-medium text-sm">
                   {trustScore}%
                 </Text>
               </View>
@@ -138,7 +130,7 @@ export default function ProfileScreen() {
           {/* KYC Status */}
           {/* <View className="flex-row items-center bg-blue-50 rounded-2xl p-3 border border-blue-100">
           <Ionicons name="shield-checkmark" size={20} color="#3B82F6" />
-          <Text className="text-blue-600 font-clash-regular text-sm ml-3 flex-1">
+          <Text className="text-blue-600 font-satoshi-regular text-sm ml-3 flex-1">
             {user?.kyc_verified
               ? "KYC Verified"
               : "Complete KYC to unlock features"}
@@ -148,7 +140,7 @@ export default function ProfileScreen() {
 
         {/* Trust Breakdown Card */}
         <View className="bg-white rounded-3xl mx-6 mt-6 p-6 border border-grey-100">
-          <Text className="text-black font-clash-semibold text-lg mb-4">
+          <Text className="text-black font-satoshi-bold text-lg mb-4">
             Trust Breakdown
           </Text>
           <View className="space-y-3 gap-4">
@@ -161,28 +153,30 @@ export default function ProfileScreen() {
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-black font-clash-semibold text-sm">
+                <Text className="text-black font-satoshi-bold text-sm">
                   Successful Payments
                 </Text>
-                <Text className="text-grey-500 font-clash-regular text-xs mt-1">
+                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
                   143 transactions
                 </Text>
               </View>
-              <Text className="text-blue-600 font-clash-bold text-lg">143</Text>
+              <Text className="text-blue-600 font-satoshi-bold text-lg">
+                143
+              </Text>
             </View>
             <View className="flex-row items-center p-4 bg-purple-50 rounded-2xl border border-purple-100">
               <View className="w-12 h-12 bg-purple-100 rounded-full items-center justify-center mr-4">
                 <Ionicons name="people-outline" size={20} color="#A855F7" />
               </View>
               <View className="flex-1">
-                <Text className="text-black font-clash-semibold text-sm">
+                <Text className="text-black font-satoshi-bold text-sm">
                   Mutual Trust
                 </Text>
-                <Text className="text-grey-500 font-clash-regular text-xs mt-1">
+                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
                   People trust you
                 </Text>
               </View>
-              <Text className="text-purple-600 font-clash-bold text-lg">
+              <Text className="text-purple-600 font-satoshi-bold text-lg">
                 38
               </Text>
             </View>
@@ -191,13 +185,13 @@ export default function ProfileScreen() {
 
         {/* Presence Activity Card */}
         {/* <View className="bg-grey-50 rounded-3xl mx-6 mt-4 p-5 border border-grey-100">
-        <Text className="text-black font-clash-semibold text-sm mb-4">
+        <Text className="text-black font-satoshi-bold text-sm mb-4">
           Where you're seen
         </Text>
         <View className="flex-row flex-wrap gap-2">
           {["Faculty Building", "Cafeteria", "Hostel Zone"].map((place) => (
             <View key={place} className="bg-green-50 rounded-full px-3 py-1">
-              <Text className="text-green-600 font-clash-regular text-sm">
+              <Text className="text-green-600 font-satoshi-regular text-sm">
                 {place}
               </Text>
             </View>
@@ -207,7 +201,7 @@ export default function ProfileScreen() {
 
         {/* Settings Section */}
         <View className="mx-6 mt-8">
-          <Text className="text-black font-clash-semibold text-lg mb-4">
+          <Text className="text-black font-satoshi-bold text-lg mb-4">
             Settings
           </Text>
           <TouchableOpacity
@@ -218,7 +212,7 @@ export default function ProfileScreen() {
               <View className="w-10 h-10 bg-purple-100 rounded-full items-center justify-center mr-4">
                 <Ionicons name="person-outline" size={18} color="#A855F7" />
               </View>
-              <Text className="text-black font-clash-semibold text-base">
+              <Text className="text-black font-satoshi-bold text-base">
                 Edit Profile
               </Text>
             </View>
@@ -236,7 +230,7 @@ export default function ProfileScreen() {
                   color="#3B82F6"
                 />
               </View>
-              <Text className="text-black font-clash-semibold text-base">
+              <Text className="text-black font-satoshi-bold text-base">
                 Notifications
               </Text>
             </View>
@@ -254,7 +248,7 @@ export default function ProfileScreen() {
                   color="#10B981"
                 />
               </View>
-              <Text className="text-black font-clash-semibold text-base">
+              <Text className="text-black font-satoshi-bold text-base">
                 Security
               </Text>
             </View>
@@ -272,7 +266,7 @@ export default function ProfileScreen() {
                   color="#F97316"
                 />
               </View>
-              <Text className="text-black font-clash-semibold text-base">
+              <Text className="text-black font-satoshi-bold text-base">
                 Help & Support
               </Text>
             </View>
@@ -287,7 +281,7 @@ export default function ProfileScreen() {
         >
           <View className="flex-row items-center">
             <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            <Text className="text-red-600 font-clash-medium text-base ml-3">
+            <Text className="text-red-600 font-satoshi-medium text-base ml-3">
               Log Out
             </Text>
           </View>

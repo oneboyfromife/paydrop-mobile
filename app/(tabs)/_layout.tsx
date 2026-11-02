@@ -28,7 +28,7 @@ export default function TabLayout() {
         },
 
         tabBarLabelStyle: {
-          fontFamily: "ClashDisplay-Medium",
+          fontFamily: "Satoshi-Medium",
           fontSize: 10,
         },
       }}

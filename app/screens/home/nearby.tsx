@@ -1,14 +1,17 @@
+import { Text } from "@/components/shared";
 /**
  * Nearby Users Screen
  * Uses BLE to discover other PayDrop users in proximity.
  * Implementation follows the useBLEDiscovery hook for scanning and broadcasting.
- * NOTE: This feature requires native modules and background modes.
+ * This release uses focused foreground sessions in a custom native build.
  * You must run a new EAS Build or prebuild to apply app.json changes.
  */
 
 import ScreenView from "@/components/layout/ScreenView";
 import { NearbyUser, useBLEDiscovery } from "@/hooks/useBLEDiscovery";
 import { useUserStore } from "@/store/userStore";
+import { useTransferStore } from "@/store/transferStore";
+import { relationshipLabel } from "@/utils/discoveryProfile";
 import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -18,7 +21,6 @@ import {
   FlatList,
   Image,
   Linking,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -26,8 +28,13 @@ import {
 export default function NearbyUsersScreen() {
   const router = useRouter();
   const user = useUserStore((state) => state.user);
-  const { nearbyUsers, isScanning, error, refreshPermissions } =
-    useBLEDiscovery("scan");
+  const {
+    nearbyUsers,
+    isScanning,
+    error,
+    resolutionError,
+    refreshPermissions,
+  } = useBLEDiscovery("scan");
 
   // Animation refs
   const pulseAnim1 = useRef(new Animated.Value(0)).current;
@@ -44,7 +51,7 @@ export default function NearbyUsersScreen() {
         opacityAnim: Animated.Value,
         delay: number,
       ) => {
-        Animated.loop(
+        const animation = Animated.loop(
           Animated.sequence([
             Animated.delay(delay),
             Animated.parallel([
@@ -72,12 +79,17 @@ export default function NearbyUsersScreen() {
               }),
             ]),
           ]),
-        ).start();
+        );
+        animation.start();
+        return animation;
       };
 
-      createPulse(pulseAnim1, opacityAnim1, 0);
-      createPulse(pulseAnim2, opacityAnim2, 400);
-      createPulse(pulseAnim3, opacityAnim3, 800);
+      const animations = [
+        createPulse(pulseAnim1, opacityAnim1, 0),
+        createPulse(pulseAnim2, opacityAnim2, 400),
+        createPulse(pulseAnim3, opacityAnim3, 800),
+      ];
+      return () => animations.forEach((animation) => animation.stop());
     } else {
       pulseAnim1.stopAnimation();
       pulseAnim2.stopAnimation();
@@ -86,9 +98,10 @@ export default function NearbyUsersScreen() {
   }, [isScanning]);
 
   const handlePay = (targetUser: NearbyUser) => {
+    if (Date.now() - targetUser.lastSeenAt >= 30000) return;
+    useTransferStore.getState().selectRecipient(targetUser);
     router.push({
       pathname: "/screens/payment/recipient-preview" as any,
-      params: { user: JSON.stringify(targetUser) },
     });
   };
 
@@ -96,7 +109,7 @@ export default function NearbyUsersScreen() {
     Linking.openSettings();
   };
 
-  const getTrustColor = (tier: string) => {
+  const getTrustColor = (tier?: string) => {
     switch (tier?.toLowerCase()) {
       case "high":
         return "#00D68F";
@@ -131,7 +144,7 @@ export default function NearbyUsersScreen() {
           />
           <View className="flex-1">
             <View className="flex-row items-center">
-              <Text className="text-[#1A1A1A] font-clash-semibold text-[17px] mr-2">
+              <Text className="text-[#1A1A1A] font-satoshi-bold text-[17px] mr-2">
                 {item.first_name} {item.last_name}
               </Text>
               <View
@@ -141,27 +154,23 @@ export default function NearbyUsersScreen() {
                 }}
               >
                 <Text
-                  className="font-clash-medium text-[10px]"
+                  className="font-satoshi-medium text-[10px]"
                   style={{ color: getTrustColor(item.trust_tier) }}
                 >
                   {(item.trust_tier || "UNKNOWN").toUpperCase()}
                 </Text>
               </View>
             </View>
-            <Text className="text-[#6B7280] font-clash-regular text-[14px]">
+            <Text className="text-[#6B7280] font-satoshi-regular text-[14px]">
               @{item.username}
             </Text>
             <View className="flex-row items-center mt-1">
-              {item.mutual_trust ? (
-                <Text className="text-[#6B7280] font-clash-medium text-[12px]">
-                  👥 {item.mutual_trust}
-                </Text>
-              ) : null}
-              {(item.presence || item.distance_signal) ? (
-                <Text className="text-purple-500 font-clash-medium text-[12px] ml-3">
-                  📍 {item.presence || (item.distance_signal === "NEAR" ? "Nearby" : item.distance_signal)}
-                </Text>
-              ) : null}
+              <Text className="text-[#6B7280] font-satoshi-medium text-[12px]">
+                {relationshipLabel(item)}
+              </Text>
+              <Text className="text-purple-500 font-satoshi-medium text-[12px] ml-3">
+                Nearby
+              </Text>
             </View>
           </View>
         </View>
@@ -178,14 +187,14 @@ export default function NearbyUsersScreen() {
         {/* Header */}
         <View className="px-6 pt-4 pb-4 bg-white flex-row justify-between items-center">
           <View>
-            <Text className="text-black font-clash-semibold text-[28px]">
+            <Text className="text-black font-satoshi-bold text-[28px]">
               Send Money
             </Text>
             <View className="flex-row items-center">
               <View
                 className={`w-2 h-2 rounded-full mr-2 ${isScanning ? "bg-green-500" : "bg-red-500"}`}
               />
-              <Text className="text-[#6B7280] font-clash-medium text-[12px]">
+              <Text className="text-[#6B7280] font-satoshi-medium text-[12px]">
                 {isScanning ? "Scanning for users..." : "Scanner paused"}
               </Text>
             </View>
@@ -212,6 +221,11 @@ export default function NearbyUsersScreen() {
           renderItem={renderNearbyUser}
           ListHeaderComponent={
             <View className="items-center justify-center py-8">
+              {resolutionError && (
+                <Text className="text-red-500 text-center px-6 mb-4">
+                  {resolutionError}
+                </Text>
+              )}
               {/* Pulsing Animation Container */}
               <View className="w-64 h-64 items-center justify-center mb-8 relative">
                 {isScanning && (
@@ -257,7 +271,7 @@ export default function NearbyUsersScreen() {
 
                 {isScanning && (
                   <View className="absolute bottom-4 bg-purple-500 px-3 py-1 rounded-full shadow-sm">
-                    <Text className="text-white font-clash-bold text-[10px]">
+                    <Text className="text-white font-satoshi-bold text-[10px]">
                       SCANNING
                     </Text>
                   </View>
@@ -265,12 +279,12 @@ export default function NearbyUsersScreen() {
               </View>
 
               <View className="px-10 items-center">
-                <Text className="text-[#1A1A1A] font-clash-semibold text-[18px] text-center mb-2">
+                <Text className="text-[#1A1A1A] font-satoshi-bold text-[18px] text-center mb-2">
                   {isScanning ? "Finding people nearby" : "Search completed"}
                 </Text>
-                <Text className="text-[#6B7280] font-clash-regular text-[14px] text-center">
+                <Text className="text-[#6B7280] font-satoshi-regular text-[14px] text-center">
                   {isScanning
-                    ? "Make sure others have this screen open to be discovered."
+                    ? "Ask the recipient to open Receive and enable nearby visibility. Internet is needed to find their profile."
                     : "No more users found. Tap below to scan again."}
                 </Text>
               </View>
@@ -282,14 +296,14 @@ export default function NearbyUsersScreen() {
                 <View className="w-16 h-16 bg-grey-50 rounded-full items-center justify-center mb-4">
                   <Ionicons name="people-outline" size={32} color="#9CA3AF" />
                 </View>
-                <Text className="text-[#6B7280] font-clash-medium text-[14px] text-center">
+                <Text className="text-[#6B7280] font-satoshi-medium text-[14px] text-center">
                   No one nearby yet.
                 </Text>
                 <TouchableOpacity
                   onPress={refreshPermissions}
                   className="mt-6 border border-purple-200 px-6 py-2 rounded-full"
                 >
-                  <Text className="text-purple-500 font-clash-bold">
+                  <Text className="text-purple-500 font-satoshi-bold">
                     Try Again
                   </Text>
                 </TouchableOpacity>
@@ -306,12 +320,12 @@ export default function NearbyUsersScreen() {
             <View className="w-20 h-20 bg-red-50 rounded-full items-center justify-center mb-6">
               <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
             </View>
-            <Text className="text-[#1A1A1A] font-clash-semibold text-[22px] mb-3 text-center">
+            <Text className="text-[#1A1A1A] font-satoshi-bold text-[22px] mb-3 text-center">
               {error.includes("permissions")
                 ? "Permissions Required"
                 : "Bluetooth Issue"}
             </Text>
-            <Text className="text-[#6B7280] font-clash-regular text-[15px] text-center mb-10 leading-6">
+            <Text className="text-[#6B7280] font-satoshi-regular text-[15px] text-center mb-10 leading-6">
               {error}
             </Text>
             <TouchableOpacity
@@ -322,13 +336,23 @@ export default function NearbyUsersScreen() {
               }
               className="bg-purple-500 rounded-full py-4 w-full items-center shadow-lg shadow-purple-200"
             >
-              <Text className="text-white font-clash-semibold text-[16px]">
+              <Text className="text-white font-satoshi-bold text-[16px]">
                 {error.includes("permissions") ? "Open Settings" : "Retry"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.back()} className="mt-6">
-              <Text className="text-[#9CA3AF] font-clash-medium">Go Back</Text>
+              <Text className="text-[#9CA3AF] font-satoshi-medium">
+                Go Back
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/screens/home/qr-scanner" as any)}
+              className="mt-6 p-3"
+            >
+              <Text className="text-purple-500 font-satoshi-medium">
+                Scan QR or enter recipient code
+              </Text>
             </TouchableOpacity>
           </View>
         )}

@@ -1,19 +1,19 @@
 import ScreenView from "@/components/layout/ScreenView";
+import { Text, TextInput } from "@/components/shared";
 import { requestOtp } from "@/services/auth";
+import size from "@/utils/size";
 import { showToast } from "@/utils/toast";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
+
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Text,
-  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -35,7 +35,6 @@ export default function LoginScreen() {
       });
     },
     onError: (error: any) => {
-      console.error("API error", error);
       showToast.error(
         "Login Failed",
         error?.message || "Something went wrong. Please try again.",
@@ -49,9 +48,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <ScreenView>
+    <ScreenView hasSafeArea={false}>
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: "white" }}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
       >
@@ -59,71 +58,80 @@ export default function LoginScreen() {
           <ScrollView
             contentContainerStyle={{
               flexGrow: 1,
-              paddingTop: 20,
-              paddingHorizontal: 24,
+
               paddingBottom: 32,
-              backgroundColor: "white",
             }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View className="flex-1 bg-white">
-              <View className="absolute inset-0 opacity-5">
-                <Image
-                  source={require("../../assets/images/bg-mesh.png")}
-                  className="w-full h-full"
-                />
-              </View>
-
+            <View className="flex-1">
               <Image
-                source={require("../../assets/images/paydrop-icon-2.png")}
-                className="size-16 mt-10 mb-4"
+                source={require("../../assets/images/def.png")}
+                style={{
+                  width: "100%",
+                  height: size.height(400),
+                  borderBottomLeftRadius: size.width(30),
+                  borderBottomRightRadius: size.width(30),
+                }}
+                // imageStyle={{ tintColor: "#6C63FF", opacity: 0.18 }}
+                resizeMode="cover"
+                accessible={false}
               />
-              <Text className="text-4xl font-clash-semibold text-black mb-2 ">
-                Login
-              </Text>
-              <Text className="text-base font-clash-regular text-grey-500 mb-10 leading-6">
-                Enter your phone number to receive a one-time login code.
-              </Text>
 
-              <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-6 border border-grey-200">
-                <Text className="text-lg font-clash-medium mr-4">+234</Text>
-                <View className="w-[1px] h-8 bg-grey-300 mr-4" />
-                <TextInput
-                  placeholder="812 345 6789"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  className="flex-1 h-full font-clash-regular text-black"
-                  value={phone}
-                  onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
-                />
-              </View>
-
-              <TouchableOpacity
-                className={`h-16 rounded-2xl justify-center items-center ${
-                  phone.length === 10 && !isPending ? "bg-purple-500" : "bg-purple-300"
-                }`}
-                onPress={handleSubmit}
-                disabled={phone.length !== 10 || isPending}
-              >
-                {isPending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text className="text-white font-clash-bold text-lg">
-                    Continue
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="mt-4 items-center"
-                onPress={() => router.push("/(auth)/register")}
-              >
-                <Text className="text-purple-500 font-clash-semibold">
-                  Need to register? Create account
+              <View className="flex-1 px-6 pt-8">
+                {/* <Text className="text-4xl font-satoshi-bold text-black mb-2 ">
+                  Login
                 </Text>
-              </TouchableOpacity>
+                <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
+                  Enter your phone number to receive a one-time login code.
+                </Text> */}
+                <Text className="font-satoshi-regular mb-3 text-neutral-500">
+                  Phone Number
+                </Text>
+                <View className="bg-neutral-100 h-16 rounded-full flex-row items-center px-6 mb-3 border border-neutral-100">
+                  <Text className="text-lg font-satoshi-medium mr-4">+234</Text>
+                  <View className="w-[1px] h-8 bg-grey-300 mr-4" />
+                  <TextInput
+                    placeholder="812 345 6789"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    className="flex-1 h-full font-satoshi-regular text-black"
+                    value={phone}
+                    onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  className={`h-16 rounded-full justify-center items-center ${
+                    phone.length === 10 && !isPending
+                      ? "bg-purple-500"
+                      : "bg-purple-300"
+                  }`}
+                  onPress={handleSubmit}
+                  disabled={phone.length !== 10 || isPending}
+                >
+                  {isPending ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-white font-satoshi-medium text-lg">
+                      Continue
+                    </Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="mt-4 items-center"
+                  onPress={() => router.push("/(auth)/register")}
+                >
+                  <Text className="font-satoshi-medium text-neutral-400">
+                    Need to register?{" "}
+                    <Text className="text-purple-500 underline ">
+                      Create account
+                    </Text>
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>

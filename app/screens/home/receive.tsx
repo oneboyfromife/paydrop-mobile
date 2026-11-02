@@ -1,81 +1,38 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import PayDropQRCode from "@/components/sections/PayDropQRCode";
 import { useBLEDiscovery } from "@/hooks/useBLEDiscovery";
-import { getQrCode } from "@/services/user";
+import { useReceiveQr } from "@/hooks/useReceiveQr";
 import { useUserStore } from "@/store/userStore";
-import {
-  getDiscoveryTokenFromQrResponse,
-  getQrCodeValue,
-} from "@/utils/qrPayload";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
   Image,
   Share,
-  Text,
+  Switch,
+  Linking,
+  ScrollView,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ReceiveScreen() {
   const router = useRouter();
-  const [qrTTL, setQrTTL] = useState<number | null>(null);
+  const [visibleNearby, setVisibleNearby] = useState(false);
   const user = useUserStore((state) => state.user);
-  const accessToken = useUserStore((state) => state.accessToken);
-  const insets = useSafeAreaInsets();
 
+  const { qrPayload, qrTTL, qrLoading, qrRefreshing, qrError, refreshQrCode } =
+    useReceiveQr();
   const {
-    data: qrData,
-    isLoading: qrLoading,
-    isRefetching: qrRefreshing,
-    error: qrError,
-    refetch: refreshQrCode,
-  } = useQuery({
-    queryKey: ["qr-code", accessToken],
-    queryFn: getQrCode,
-    enabled: !!accessToken,
-  });
-
-  const discoveryToken = getDiscoveryTokenFromQrResponse(qrData);
-  const qrPayload = getQrCodeValue(qrData) ?? discoveryToken ?? "";
-
-  // Use the same token as the QR for BLE broadcast
-  const { isAdvertising, error: bleError } = useBLEDiscovery(
-    "advertise",
-    discoveryToken,
-  );
-
-  useEffect(() => {
-    if (qrData) {
-      const ttl =
-        typeof qrData?.ttl === "number"
-          ? qrData.ttl
-          : typeof qrData?.expires_in === "number"
-            ? qrData.expires_in
-            : 60;
-      setQrTTL(ttl);
-    }
-  }, [qrData]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setQrTTL((prev) => (prev !== null ? Math.max(prev - 1, 0) : null));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (qrTTL !== null && qrTTL <= 10 && !qrRefreshing) {
-      refreshQrCode();
-    }
-  }, [qrTTL, qrRefreshing]);
+    isAdvertising,
+    isStarting,
+    error: bleError,
+    retry,
+  } = useBLEDiscovery("advertise", visibleNearby);
 
   const handleShareQr = async () => {
     if (!qrPayload) return;
@@ -84,8 +41,8 @@ export default function ReceiveScreen() {
       await Share.share({
         message: `Pay me on PayDrop: ${qrPayload}`,
       });
-    } catch (error) {
-      console.error("Share error", error);
+    } catch {
+      // Sharing may be cancelled by the native sheet.
     }
   };
 
@@ -109,14 +66,14 @@ export default function ReceiveScreen() {
         {/* Header */}
         <View className="px-6 pt-4 pb-4 bg-white flex-row justify-between items-center">
           <View>
-            <Text className="text-black font-clash-semibold text-2xl ">
+            <Text className="text-black font-satoshi-bold text-2xl ">
               Receive Money
             </Text>
             <View className="flex-row items-center">
               <View
                 className={`w-2 h-2 rounded-full mr-2 ${isAdvertising ? "bg-green-500" : "bg-red-500"}`}
               />
-              <Text className="text-[#6B7280] font-clash-medium text-[12px]">
+              <Text className="text-[#6B7280] font-satoshi-medium text-[12px]">
                 {isAdvertising
                   ? "Discoverable to nearby users"
                   : "Not discoverable"}
@@ -131,7 +88,30 @@ export default function ReceiveScreen() {
           </TouchableOpacity>
         </View>
 
-        <View className="flex-1 items-center px-6 mt-10">
+        <ScrollView
+          contentContainerStyle={{
+            alignItems: "center",
+            paddingHorizontal: 24,
+            paddingTop: 20,
+            paddingBottom: 40,
+          }}
+        >
+          <View className="w-full flex-row items-center justify-between mb-4">
+            <View className="flex-1 mr-4">
+              <Text className="font-satoshi-bold">
+                Visible to nearby senders
+              </Text>
+              <Text className="text-grey-500 text-xs">
+                Keep this screen open to receive nearby.
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Visible to nearby senders"
+              value={visibleNearby}
+              onValueChange={setVisibleNearby}
+              disabled={isStarting}
+            />
+          </View>
           <View className="bg-white rounded-[32px] p-[24px] border border-grey-200 shadow-sm w-full max-w-[320px] items-center">
             {qrLoading ? (
               <View
@@ -155,12 +135,24 @@ export default function ReceiveScreen() {
                   justifyContent: "center",
                 }}
               >
-                <Text className="text-grey-400 font-clash-medium text-center">
-                  Unable to load QR code.{"\n"}Please try again.
+                <Text className="text-grey-400 font-satoshi-medium text-center">
+                  {qrError
+                    ? "Unable to load a valid QR code."
+                    : "Refreshing receiving code..."}
                 </Text>
               </View>
             )}
           </View>
+          {qrError && (
+            <TouchableOpacity
+              onPress={() => {
+                void refreshQrCode();
+              }}
+              className="p-3"
+            >
+              <Text className="text-purple-500">Retry QR code</Text>
+            </TouchableOpacity>
+          )}
 
           <View className="items-center mt-8">
             <View className="relative">
@@ -177,10 +169,10 @@ export default function ReceiveScreen() {
                 className={`absolute bottom-2 -right-0 ${isAdvertising ? "bg-green-500" : "bg-red-500"} w-4 h-4 rounded-full border-2 border-white`}
               />
             </View>
-            <Text className="mt-4 text-black font-clash-semibold text-lg">
+            <Text className="mt-4 text-black font-satoshi-bold text-lg">
               {fullName}
             </Text>
-            <Text className="text-grey-500 font-clash-medium text-[14px] mt-0.5">
+            <Text className="text-grey-500 font-satoshi-medium text-[14px] mt-0.5">
               {username}
             </Text>
           </View>
@@ -196,7 +188,7 @@ export default function ReceiveScreen() {
                 color="white"
                 className="mr-2"
               />
-              <Text className="text-white font-clash-semibold text-[16px] ml-2">
+              <Text className="text-white font-satoshi-bold text-[16px] ml-2">
                 Share QR
               </Text>
             </TouchableOpacity>
@@ -212,18 +204,36 @@ export default function ReceiveScreen() {
           {(qrRefreshing || (qrTTL !== null && qrTTL <= 15)) && (
             <View className="mt-6 flex-row items-center">
               <ActivityIndicator size="small" color="#9CA3AF" />
-              <Text className="ml-2 text-[#9CA3AF] font-clash-medium text-[12px]">
+              <Text className="ml-2 text-[#9CA3AF] font-satoshi-medium text-[12px]">
                 Refreshing code in {qrTTL}s
               </Text>
             </View>
           )}
 
           {bleError && (
-            <Text className="mt-6 text-red-500 font-clash-medium text-xs text-center px-4">
-              {bleError}
-            </Text>
+            <View className="mt-6 items-center">
+              <Text className="text-red-500 font-satoshi-medium text-xs text-center">
+                {bleError}
+              </Text>
+              <TouchableOpacity
+                onPress={
+                  bleError.includes("permissions")
+                    ? () => {
+                        void Linking.openSettings();
+                      }
+                    : retry
+                }
+                className="p-3"
+              >
+                <Text className="text-purple-500">
+                  {bleError.includes("permissions")
+                    ? "Open Settings"
+                    : "Retry visibility"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </View>
+        </ScrollView>
       </View>
     </ScreenView>
   );

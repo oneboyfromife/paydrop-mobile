@@ -1,143 +1,129 @@
+import { Text, TextInput } from "@/components/shared";
 import { resolveDiscoveryToken } from "@/services/user";
+import { useTransferStore } from "@/store/transferStore";
 import { extractDiscoveryToken } from "@/utils/discoveryToken";
+import { resolvedProfiles } from "@/utils/discoveryProfile";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
+import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
   StyleSheet,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 
 export default function QRScannerScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [manualCode, setManualCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [scanLocked, setScanLocked] = useState(false);
-
   const isProcessingRef = useRef(false);
-
+  const epoch = useRef(0);
+  const abort = useRef<AbortController | null>(null);
+  const scannerSettings = { barcodeTypes: ["qr"] as "qr"[] };
   const handleOpenSettings = () => {
-    Linking.openSettings();
+    void Linking.openSettings();
   };
 
-  const resetScanner = () => {
-    isProcessingRef.current = false;
-    setScanLocked(false);
-  };
-
-  const resolveWithCandidates = async (raw: string) => {
-    const trimmed = raw.trim();
-    const extracted = extractDiscoveryToken(trimmed);
-    const candidates = [
-      trimmed,
-      ...(extracted && extracted !== trimmed ? [extracted] : []),
-    ];
-
-    let lastError: unknown;
-    for (const token of candidates) {
-      try {
-        return await resolveDiscoveryToken(token);
-      } catch (err) {
-        lastError = err;
-        console.warn("[QR Scanner] Resolve failed for:", token, err);
-      }
-    }
-    throw lastError ?? new Error("QR not recognised");
-  };
+  useFocusEffect(
+    useCallback(() => {
+      epoch.current++;
+      isProcessingRef.current = false;
+      setScanLocked(false);
+      setError(null);
+      return () => {
+        epoch.current++;
+        abort.current?.abort();
+      };
+    }, []),
+  );
 
   const { mutate: resolveMutate, isPending: resolving } = useMutation({
-    mutationFn: (raw: string) => resolveWithCandidates(raw),
-    onSuccess: (response: any, raw: string) => {
-      let foundUser = null;
-
-      if (response && response.user && !Array.isArray(response.user)) {
-        foundUser = response.user;
-      } else {
-        const users = Array.isArray(response)
-          ? response
-          : response?.data?.users ||
-            response?.data ||
-            response?.users ||
-            response?.resolved ||
-            [];
-        if (users && users.length > 0) {
-          foundUser = users[0];
-        }
-      }
-
-      if (foundUser) {
-        const token =
-          extractDiscoveryToken(raw) ?? raw.trim();
-        router.push({
-          pathname: "/screens/payment/recipient-preview" as any,
-          params: { user: JSON.stringify(foundUser), token },
-        });
-        return;
-      }
-
-      console.error("User not found, response was:", response);
-      setError("User not found for this code");
-      resetScanner();
-      setTimeout(() => setError(null), 3000);
+    mutationFn: async ({
+      raw,
+      requestEpoch,
+    }: {
+      raw: string;
+      requestEpoch: number;
+    }) => {
+      abort.current = new AbortController();
+      const token = extractDiscoveryToken(raw);
+      if (!token) throw new Error("Enter a valid PayDrop recipient code.");
+      const response = await resolveDiscoveryToken(token, abort.current.signal);
+      const recipient = resolvedProfiles(response)[0];
+      if (!recipient)
+        throw new Error("This recipient code is invalid or expired.");
+      return { recipient, requestEpoch };
     },
-    onError: (err: any) => {
-      console.error("QR resolve error", err);
-      const message =
-        (typeof err === "string" && err) ||
-        err?.message ||
-        err?.error ||
-        (typeof err?.response?.data === "string" && err.response.data) ||
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        "QR not recognised";
-      setError(typeof message === "string" ? message : "QR not recognised");
-      resetScanner();
-      setTimeout(() => setError(null), 3000);
+    onSuccess: ({ recipient, requestEpoch }) => {
+      if (requestEpoch !== epoch.current) return;
+      useTransferStore.getState().selectRecipient(recipient);
+      router.push("/screens/payment/recipient-preview" as any);
+    },
+    onError: (_error, { requestEpoch }) => {
+      if (requestEpoch !== epoch.current) return;
+      setError(
+        "Unable to resolve this recipient. Check your connection and use a current code.",
+      );
+      isProcessingRef.current = false;
+      setScanLocked(false);
     },
   });
 
   const resolveRawCode = (raw: string) => {
-    const trimmed = raw?.trim();
-    if (!trimmed) {
-      setError("Invalid QR code");
-      resetScanner();
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-
-    console.log("[QR Scanner] Resolving:", trimmed);
-    resolveMutate(trimmed);
-  };
-
-  const handleBarCodeScanned = (scanResult: { type: string; data: string }) => {
-    if (isProcessingRef.current || scanLocked || resolving) return;
+    if (!raw.trim() || isProcessingRef.current || resolving) return;
     isProcessingRef.current = true;
     setScanLocked(true);
-
-    console.log("[QR Scanner] Scanned!", scanResult.type, scanResult.data);
-
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {},
-    );
-
+    setError(null);
+    resolveMutate({ raw: raw.trim(), requestEpoch: epoch.current });
+  };
+  const handleBarCodeScanned = (scanResult: { type: string; data: string }) => {
+    if (scanLocked || isProcessingRef.current || resolving) return;
+    void Haptics.notificationAsync(
+      Haptics.NotificationFeedbackType.Success,
+    ).catch(() => {});
     resolveRawCode(scanResult.data);
   };
-
-  const handleManualResolve = () => {
-    if (!manualCode.trim() || resolving || scanLocked) return;
-    isProcessingRef.current = true;
-    setScanLocked(true);
-    resolveRawCode(manualCode);
-  };
+  const handleManualResolve = () => resolveRawCode(manualCode);
+  const manualEntry = (
+    <View>
+      <TextInput
+        accessibilityLabel="Recipient code"
+        value={manualCode}
+        onChangeText={setManualCode}
+        placeholder="Paste recipient code"
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={{
+          borderWidth: 1,
+          borderColor: "#D1D5DB",
+          borderRadius: 12,
+          padding: 14,
+          marginTop: 16,
+        }}
+      />
+      <TouchableOpacity
+        disabled={resolving || scanLocked || !manualCode.trim()}
+        onPress={handleManualResolve}
+        style={{ padding: 16 }}
+      >
+        <Text style={{ color: "#A855F7", textAlign: "center" }}>
+          {resolving
+            ? "Looking up recipient..."
+            : "Continue with recipient code"}
+        </Text>
+      </TouchableOpacity>
+      {error && <Text style={{ color: "#DC2626" }}>{error}</Text>}
+    </View>
+  );
 
   if (!permission) {
     return (
@@ -159,10 +145,10 @@ export default function QRScannerScreen() {
 
         <View className="flex-1 items-center justify-center -mt-20">
           <Ionicons name="camera-outline" size={64} color="#9CA3AF" />
-          <Text className="text-[#1A1A1A] font-clash-semibold text-[20px] mb-2 mt-4">
+          <Text className="text-[#1A1A1A] font-satoshi-bold text-[20px] mb-2 mt-4">
             Camera access needed
           </Text>
-          <Text className="text-[#6B7280] font-clash-regular text-[14px] text-center mb-8">
+          <Text className="text-[#6B7280] font-satoshi-regular text-[14px] text-center mb-8">
             To scan QR codes, we need camera access.
           </Text>
           <TouchableOpacity
@@ -171,24 +157,30 @@ export default function QRScannerScreen() {
             }
             className="bg-purple-500 rounded-2xl px-8 py-5 w-full items-center"
           >
-            <Text className="text-white text-[16px] font-clash-bold">
+            <Text className="text-white text-[16px] font-satoshi-bold">
               {permission.canAskAgain ? "Grant Permission" : "Open Settings"}
             </Text>
           </TouchableOpacity>
+          {manualEntry}
         </View>
       </View>
     );
   }
 
-  const canScan = !scanLocked && !resolving;
+  if (!isFocused) return <View style={styles.container} />;
 
   return (
     <View style={styles.container}>
       <CameraView
+        key={isFocused ? "focused" : "blurred"}
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        onBarcodeScanned={canScan ? handleBarCodeScanned : undefined}
-        barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+        onBarcodeScanned={
+          scanLocked || resolving ? undefined : handleBarCodeScanned
+        }
+        barcodeScannerSettings={scannerSettings}
+        active={isFocused}
+        {...({ barcodeScannerEnabled: true } as any)}
       />
 
       <View style={styles.overlay} pointerEvents="none">
@@ -208,7 +200,7 @@ export default function QRScannerScreen() {
           <Ionicons name="close" size={24} color="white" />
         </TouchableOpacity>
         <View className="flex-1 items-center mr-10">
-          <Text className="text-white font-clash-semibold text-[18px]">
+          <Text className="text-white font-satoshi-bold text-[18px]">
             Scan their QR code
           </Text>
         </View>
@@ -217,7 +209,7 @@ export default function QRScannerScreen() {
       {resolving && (
         <View style={styles.resolvingBanner}>
           <ActivityIndicator size="small" color="#FFFFFF" />
-          <Text className="text-white font-clash-medium text-[14px] ml-2">
+          <Text className="text-white font-satoshi-medium text-[14px] ml-2">
             Looking up user...
           </Text>
         </View>
@@ -225,14 +217,14 @@ export default function QRScannerScreen() {
 
       {error && (
         <View style={styles.errorBanner}>
-          <Text className="text-white font-clash-bold text-[14px] text-center">
+          <Text className="text-white font-satoshi-bold text-[14px] text-center">
             {error}
           </Text>
         </View>
       )}
 
       <View style={styles.manualInput}>
-        <Text className="text-[#6B7280] font-clash-medium text-[12px] mb-3 ml-1">
+        <Text className="text-[#6B7280] font-satoshi-medium text-[12px] mb-3 ml-1">
           Enter code manually
         </Text>
         <View className="flex-row items-center bg-[#F3F4F6] rounded-2xl px-4 h-[56px] border border-grey-100">
@@ -241,7 +233,7 @@ export default function QRScannerScreen() {
             onChangeText={setManualCode}
             placeholder="Paste code or token"
             placeholderTextColor="#9CA3AF"
-            className="flex-1 text-[#1A1A1A] font-clash-regular text-[15px]"
+            className="flex-1 text-[#1A1A1A] font-satoshi-regular text-[15px]"
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -253,7 +245,7 @@ export default function QRScannerScreen() {
             {resolving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text className="text-white font-clash-bold text-[14px]">
+              <Text className="text-white font-satoshi-bold text-[14px]">
                 Resolve
               </Text>
             )}

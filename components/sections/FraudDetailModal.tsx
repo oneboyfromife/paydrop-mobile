@@ -1,3 +1,4 @@
+import { Text } from "@/components/shared";
 import { getFraudDetail } from "@/services/user";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
@@ -5,7 +6,6 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -62,7 +62,7 @@ export default function FraudDetailModal({
         >
           <View className="flex-row items-center justify-between mb-8">
             <View className="w-10" />
-            <Text className="text-black font-clash-semibold text-xl">
+            <Text className="text-black font-satoshi-bold text-xl">
               Fraud Analysis
             </Text>
             <TouchableOpacity
@@ -76,14 +76,14 @@ export default function FraudDetailModal({
           {isLoading ? (
             <View className="py-20 items-center justify-center">
               <ActivityIndicator size="large" color="#7C3AED" />
-              <Text className="mt-4 text-grey-500 font-clash-medium">
+              <Text className="mt-4 text-grey-500 font-satoshi-medium">
                 Analyzing transaction...
               </Text>
             </View>
           ) : error ? (
             <View className="py-20 items-center justify-center">
               <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-              <Text className="mt-4 text-red-500 font-clash-medium text-center">
+              <Text className="mt-4 text-red-500 font-satoshi-medium text-center">
                 Failed to load fraud details.{"\n"}Please try again later.
               </Text>
             </View>
@@ -100,13 +100,13 @@ export default function FraudDetailModal({
                   }`}
                 >
                   <Text
-                    className={`text-4xl font-clash-bold ${getScoreColor(
+                    className={`text-4xl font-satoshi-bold ${getScoreColor(
                       fraudData?.fraud_score || 0,
                     )}`}
                   >
                     {fraudData?.fraud_score || 0}
                   </Text>
-                  <Text className="text-grey-400 font-clash-medium text-xs">
+                  <Text className="text-grey-400 font-satoshi-medium text-xs">
                     RISK SCORE
                   </Text>
                 </View>
@@ -116,7 +116,7 @@ export default function FraudDetailModal({
                   )}`}
                 >
                   <Text
-                    className={`font-clash-semibold text-sm ${getScoreColor(
+                    className={`font-satoshi-bold text-sm ${getScoreColor(
                       fraudData?.fraud_score || 0,
                     )}`}
                   >
@@ -128,27 +128,29 @@ export default function FraudDetailModal({
               <View className="space-y-6">
                 {/* Risk Factors */}
                 <View>
-                  <Text className="text-black font-clash-semibold text-base mb-3">
+                  <Text className="text-black font-satoshi-bold text-base mb-3">
                     Risk Indicators
                   </Text>
                   <View className="bg-grey-50 rounded-2xl p-4 border border-grey-100">
                     {fraudData?.risk_factors?.length > 0 ? (
-                      fraudData.risk_factors.map((factor: string, index: number) => (
-                        <View
-                          key={index}
-                          className="flex-row items-start mb-2 last:mb-0"
-                        >
-                          <Ionicons
-                            name="warning-outline"
-                            size={16}
-                            color="#F59E0B"
-                            style={{ marginTop: 2 }}
-                          />
-                          <Text className="ml-2 text-grey-700 font-clash-regular text-sm flex-1">
-                            {factor}
-                          </Text>
-                        </View>
-                      ))
+                      fraudData.risk_factors.map(
+                        (factor: string, index: number) => (
+                          <View
+                            key={index}
+                            className="flex-row items-start mb-2 last:mb-0"
+                          >
+                            <Ionicons
+                              name="warning-outline"
+                              size={16}
+                              color="#F59E0B"
+                              style={{ marginTop: 2 }}
+                            />
+                            <Text className="ml-2 text-grey-700 font-satoshi-regular text-sm flex-1">
+                              {factor}
+                            </Text>
+                          </View>
+                        ),
+                      )
                     ) : (
                       <View className="flex-row items-center">
                         <Ionicons
@@ -156,7 +158,7 @@ export default function FraudDetailModal({
                           size={18}
                           color="#10B981"
                         />
-                        <Text className="ml-2 text-green-600 font-clash-medium text-sm">
+                        <Text className="ml-2 text-green-600 font-satoshi-medium text-sm">
                           No significant risk factors detected
                         </Text>
                       </View>
@@ -166,7 +168,7 @@ export default function FraudDetailModal({
 
                 {/* Device Info */}
                 <View className="mt-6">
-                  <Text className="text-black font-clash-semibold text-base mb-3">
+                  <Text className="text-black font-satoshi-bold text-base mb-3">
                     Device Details
                   </Text>
                   <View className="bg-white rounded-2xl border border-grey-100 overflow-hidden">
@@ -201,7 +203,7 @@ export default function FraudDetailModal({
                 {/* Network Info */}
                 {fraudData?.network_info && (
                   <View className="mt-6">
-                    <Text className="text-black font-clash-semibold text-base mb-3">
+                    <Text className="text-black font-satoshi-bold text-base mb-3">
                       Network Analysis
                     </Text>
                     <View className="bg-white rounded-2xl border border-grey-100 overflow-hidden">
@@ -209,13 +211,21 @@ export default function FraudDetailModal({
                         label="VPN Detected"
                         value={fraudData.network_info.vpn ? "Yes" : "No"}
                         icon="shield-checkmark-outline"
-                        valueColor={fraudData.network_info.vpn ? "text-red-600" : "text-green-600"}
+                        valueColor={
+                          fraudData.network_info.vpn
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }
                       />
                       <DetailRow
                         label="Proxy Detected"
                         value={fraudData.network_info.proxy ? "Yes" : "No"}
                         icon="swap-horizontal-outline"
-                        valueColor={fraudData.network_info.proxy ? "text-red-600" : "text-green-600"}
+                        valueColor={
+                          fraudData.network_info.proxy
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }
                         isLast
                       />
                     </View>
@@ -227,7 +237,7 @@ export default function FraudDetailModal({
                 onPress={onClose}
                 className="mt-10 bg-black h-14 rounded-2xl items-center justify-center"
               >
-                <Text className="text-white font-clash-semibold text-base">
+                <Text className="text-white font-satoshi-bold text-base">
                   Dismiss
                 </Text>
               </TouchableOpacity>
@@ -262,9 +272,11 @@ function DetailRow({
         <View className="w-8 h-8 bg-grey-50 rounded-full items-center justify-center mr-3">
           <Ionicons name={icon} size={16} color="#4B5563" />
         </View>
-        <Text className="text-grey-500 font-clash-medium text-sm">{label}</Text>
+        <Text className="text-grey-500 font-satoshi-medium text-sm">
+          {label}
+        </Text>
       </View>
-      <Text className={`${valueColor} font-clash-semibold text-sm`}>{value}</Text>
+      <Text className={`${valueColor} font-satoshi-bold text-sm`}>{value}</Text>
     </View>
   );
 }

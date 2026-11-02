@@ -1,30 +1,47 @@
+import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useTransferStore } from "@/store/transferStore";
+import { relationshipLabel } from "@/utils/discoveryProfile";
+import { Image, TouchableOpacity, View } from "react-native";
 
 export default function RecipientPreviewScreen() {
   const router = useRouter();
-  const { user: userParam } = useLocalSearchParams<{ user: string }>();
-
-  const recipient = userParam ? JSON.parse(userParam) : null;
+  const recipient = useTransferStore((state) => state.recipient);
 
   if (!recipient) return null;
 
-  const trustTier = (recipient.trust_tier || "medium").toLowerCase();
-  const trustScore = recipient.trust_score ?? 0;
+  const trustTier = (recipient.trust_tier || "unknown").toLowerCase();
+  const trustScore = recipient.trust_score;
 
   const getTierBadge = () => {
     switch (trustTier) {
       case "high":
-        return { bg: "#00D68F", label: "✅ Trusted", color: "#000000" };
+        return {
+          bg: "#00D68F",
+          label: "Server trust tier: High",
+          color: "#000000",
+        };
       case "medium":
-        return { bg: "#FFB347", label: "⚠️ Caution", color: "#000000" };
+        return {
+          bg: "#FFB347",
+          label: "Server trust tier: Medium",
+          color: "#000000",
+        };
       case "low":
-        return { bg: "#FF6B6B", label: "🚫 High Risk", color: "#FFFFFF" };
+        return {
+          bg: "#FF6B6B",
+          label: "Server trust tier: Low",
+          color: "#FFFFFF",
+        };
       default:
-        return { bg: "#F3F4F6", label: "Unknown", color: "#1A1A1A" };
+        return {
+          bg: "#F3F4F6",
+          label: "Trust context unavailable",
+          color: "#1A1A1A",
+        };
     }
   };
 
@@ -49,10 +66,10 @@ export default function RecipientPreviewScreen() {
               }}
               className="w-20 h-20 rounded-full mb-4"
             />
-            <Text className="text-[#1A1A1A] font-clash-semibold text-[22px]">
+            <Text className="text-[#1A1A1A] font-satoshi-bold text-[22px]">
               {recipient.first_name} {recipient.last_name}
             </Text>
-            <Text className="text-[#6B7280] font-clash-regular text-[15px] mb-4">
+            <Text className="text-[#6B7280] font-satoshi-regular text-[15px] mb-4">
               {recipient.username}
             </Text>
 
@@ -62,54 +79,34 @@ export default function RecipientPreviewScreen() {
             >
               <Text
                 style={{ color: badge.color }}
-                className="font-clash-medium text-[14px]"
+                className="font-satoshi-medium text-[14px]"
               >
                 {badge.label}
               </Text>
             </View>
 
-            {trustScore > 0 && (
-              <Text className="text-[#6B7280] font-clash-regular text-[14px] mb-1">
-                {trustScore}% trust score
+            {trustScore !== undefined && (
+              <Text className="text-[#6B7280] font-satoshi-regular text-[14px] mb-1">
+                Server trust score: {trustScore}
               </Text>
             )}
-            {recipient.mutual_trust && (
-              <Text className="text-[#6B7280] font-clash-regular text-[13px] mb-1">
-                👥 Trusted by {recipient.mutual_trust}
-              </Text>
-            )}
-            {recipient.presence && (
-              <Text className="text-[#6B7280] font-clash-regular text-[13px]">
-                📍 {recipient.presence}
-              </Text>
-            )}
-            {recipient.distance_signal && !recipient.presence && (
-              <Text className="text-[#6B7280] font-clash-regular text-[13px]">
-                📍{" "}
-                {recipient.distance_signal === "NEAR"
-                  ? "Nearby"
-                  : recipient.distance_signal}
-              </Text>
-            )}
+            <Text className="text-[#6B7280] font-satoshi-regular text-[13px] mb-1">
+              {relationshipLabel(recipient)}
+            </Text>
+            <Text className="text-grey-500 text-sm text-center mt-4">
+              Confirm this is the person you intend to pay. Relationship
+              information is context, not a safety guarantee.
+            </Text>
           </View>
         </View>
 
         <View className="px-6 pb-12">
           <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: "/screens/payment/enter-amount" as any,
-                params: {
-                  recipientId: recipient.id,
-                  recipientName: `${recipient.first_name} ${recipient.last_name}`,
-                  recipientAvatar: recipient.avatar_url,
-                },
-              })
-            }
+            onPress={() => router.push("/screens/payment/enter-amount")}
             className="bg-purple-400 rounded-full items-center justify-center w-full mb-4"
             style={{ paddingVertical: size.height(18) }}
           >
-            <Text className="text-white font-clash-semibold text-[16px]">
+            <Text className="text-white font-satoshi-bold text-[16px]">
               Proceed to Pay
             </Text>
           </TouchableOpacity>
@@ -117,7 +114,7 @@ export default function RecipientPreviewScreen() {
             onPress={() => router.back()}
             className="items-center"
           >
-            <Text className="text-[#6B7280] font-clash-medium text-[14px]">
+            <Text className="text-[#6B7280] font-satoshi-medium text-[14px]">
               Cancel
             </Text>
           </TouchableOpacity>
