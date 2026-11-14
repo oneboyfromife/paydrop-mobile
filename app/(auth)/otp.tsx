@@ -234,7 +234,7 @@ export default function OTPScreen() {
 
               <View className="flex-row justify-center">
                 <Text className="text-grey-500 font-satoshi-regular text-base">
-                  Didn't receive the code?{" "}
+                  Didn&apos;t receive the code?{" "}
                 </Text>
                 <TouchableOpacity onPress={handleResend}>
                   <Text className="text-purple-500 font-satoshi-bold text-base">
