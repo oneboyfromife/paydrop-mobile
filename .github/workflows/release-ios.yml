@@ -1,0 +1,52 @@
+name: Release iOS
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: release-ios
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches app.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$APP_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match app.json version $APP_VERSION"
+            exit 1
+          fi
+
+      - name: Check eas.json placeholders are filled in
+        run: |
+          if grep -n "REPLACE_WITH_" eas.json; then
+            echo "::error::Fill in the testflight values in eas.json before releasing"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: yarn install --frozen-lockfile --network-timeout 120000
+
+      - name: Build on EAS and submit to TestFlight
+        run: eas build --platform ios --profile testflight --non-interactive --auto-submit-with-profile testflight
