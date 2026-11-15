@@ -85,3 +85,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## BLE social transfers
 
 See [the architecture and staging contract guide](docs/ble-transfer-architecture.md) for lifecycle ownership, payment recovery, secure credential migration, public configuration and the device validation matrix. New financial submissions stay disabled until `EXPO_PUBLIC_TRANSFER_CONTRACT_CONFIRMED=true` is explicitly configured after staging validation.
+
+## 🚀 CI/CD (iOS)
+
+- **CI** (`.github/workflows/ci.yml`) runs on every PR and push to `main`: lint, typecheck, tests, `expo-doctor`, `expo install --check`, a JS bundle export and an iOS `prebuild` to catch config-plugin errors before spending EAS build credits.
+- **Release iOS** (`.github/workflows/release-ios.yml`) runs those checks, then builds with the `testflight` EAS profile and submits to TestFlight.
+
+The `testflight` profile sets `APP_VARIANT=fork`, which makes `app.config.ts` swap in a separate Expo project, owner and bundle ID. Builds with the other profiles use `app.json` unchanged.
+
+To release:
+
+1. Bump `expo.version` in `app.json` (e.g. `1.2.1`) and merge to `main`.
+2. `git tag v1.2.1 && git push origin v1.2.1` (or run **Release iOS** from the Actions tab).
+
+The tag must match `app.json`. EAS auto-increments the build number.
+
+One-time setup: fill in the `REPLACE_WITH_*` values in `eas.json` (`testflight` build and submit profiles), add an `EXPO_TOKEN` repository secret, and store iOS signing credentials plus an App Store Connect API key in EAS (`eas credentials -p ios`).

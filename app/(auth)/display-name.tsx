@@ -42,7 +42,7 @@ export default function DisplayNameScreen() {
       </TouchableOpacity>
 
       <Text className="text-3xl font-satoshi-bold text-black mb-2">
-        What's your name?
+        What&apos;s your name?
       </Text>
       <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
         Enter your full name so your friends and vendors can recognize you.

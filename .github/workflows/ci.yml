@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: yarn install --frozen-lockfile --network-timeout 120000
+
+      - name: Lint
+        run: yarn lint
+      - name: Typecheck
+        run: yarn typecheck
+      - name: Test
+        run: yarn test
+
+      - name: Expo doctor
+        run: npx expo-doctor
+      - name: Check dependency versions match the Expo SDK
+        run: npx expo install --check
+
+      - name: Validate JS bundle
+        run: npx expo export --platform ios --output-dir dist
+      - name: Validate native project generation (config plugins)
+        run: npx expo prebuild --platform ios --no-install --clean

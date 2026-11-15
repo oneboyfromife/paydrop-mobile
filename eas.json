@@ -5,6 +5,7 @@
   },
   "build": {
     "development": {
+      "node": "22.14.0",
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
@@ -16,10 +17,12 @@
       "channel": "development"
     },
     "preview": {
+      "node": "22.14.0",
       "distribution": "internal",
       "channel": "preview"
     },
     "production": {
+      "node": "22.14.0",
       "autoIncrement": true,
       "channel": "production"
     },
@@ -29,12 +32,27 @@
         "simulator": false
       },
       "channel": "development"
+    },
+    "testflight": {
+      "extends": "production",
+      "environment": "production",
+      "env": {
+        "APP_VARIANT": "fork",
+        "EXPO_OWNER": "REPLACE_WITH_YOUR_EXPO_USERNAME",
+        "EAS_PROJECT_ID": "REPLACE_WITH_YOUR_EAS_PROJECT_ID",
+        "IOS_BUNDLE_ID": "REPLACE_WITH_YOUR_BUNDLE_ID"
+      }
     }
   },
   "submit": {
     "production": {
       "ios": {
         "ascAppId": "6767659511"
+      }
+    },
+    "testflight": {
+      "ios": {
+        "ascAppId": "REPLACE_WITH_YOUR_ASC_APP_ID"
       }
     }
   }
