@@ -38,9 +38,10 @@
       "environment": "production",
       "env": {
         "APP_VARIANT": "fork",
-        "EXPO_OWNER": "REPLACE_WITH_YOUR_EXPO_USERNAME",
-        "EAS_PROJECT_ID": "REPLACE_WITH_YOUR_EAS_PROJECT_ID",
-        "IOS_BUNDLE_ID": "REPLACE_WITH_YOUR_BUNDLE_ID"
+        "EXPO_OWNER": "oneboyfromife",
+        "EXPO_SLUG": "paydrop-mobile",
+        "EAS_PROJECT_ID": "3675fd77-9901-4d22-ba8f-2f95f7f32ec4",
+        "IOS_BUNDLE_ID": "com.paydrop.paydrop"
       }
     }
   },
@@ -52,7 +53,7 @@
     },
     "testflight": {
       "ios": {
-        "ascAppId": "REPLACE_WITH_YOUR_ASC_APP_ID"
+        "ascAppId": "6767659511"
       }
     }
   }
