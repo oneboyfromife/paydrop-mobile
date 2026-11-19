@@ -52,6 +52,7 @@
     },
     "plugins": [
       "./plugins/withBleAdvertiser.js",
+      "./plugins/withSceneLifecycle.js",
 
       "expo-router",
       [
