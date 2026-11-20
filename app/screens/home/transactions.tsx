@@ -1,7 +1,9 @@
 import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
 import FraudDetailModal from "@/components/sections/FraudDetailModal";
-import api from "@/services/api";
+import CounterpartyName from "@/components/sections/CounterpartyName";
+import { getTransactions } from "@/services/user";
+import { isOutgoing, type Transaction } from "@/types/api";
 import { useUserStore } from "@/store/userStore";
 import { koboToNaira } from "@/utils/currency";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,22 +18,8 @@ import {
   View,
 } from "react-native";
 
-interface Transaction {
-  id: string;
-  sender_id: string;
-  recipient_id: string;
-  amount: number;
-  status: string;
-  note: string;
-  squad_ref: string;
-  fraud_score: number;
-  fraud_verdict: string;
-  createdAt: string;
-  updatedAt: string;
-  direction?: string;
-}
-
 const FILTERS = ["All", "Sent", "Received"] as const;
+const PAGE_SIZE = 10;
 
 type FilterType = (typeof FILTERS)[number];
 
@@ -44,24 +32,26 @@ export default function TransactionsScreen() {
   const query = useInfiniteQuery({
     queryKey: ["transactions", accountId, "history"],
     enabled: !!accessToken,
-    initialPageParam: 0,
-    queryFn: async ({ pageParam, signal }) => {
-      const response = await api.get("/transactions", {
-        params: { page: pageParam, limit: 10 },
-        signal,
-      });
-      const body = response.data?.data ?? response.data;
-      return (
-        Array.isArray(body?.transactions) ? body.transactions : []
-      ) as Transaction[];
+    // Pages are 1-based; the API treats page 0 as page 1.
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const page = await getTransactions(pageParam, PAGE_SIZE);
+      return {
+        page: pageParam,
+        total: page.total ?? 0,
+        transactions: Array.isArray(page.transactions) ? page.transactions : [],
+      };
     },
-    getNextPageParam: (lastPage, pages) =>
-      lastPage.length >= 10 ? pages.length : undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.page * PAGE_SIZE < lastPage.total &&
+      lastPage.transactions.length > 0
+        ? lastPage.page + 1
+        : undefined,
   });
   const transactions = useMemo(() => {
     const byId = new Map<string, Transaction>();
     query.data?.pages
-      .flat()
+      .flatMap((page) => page.transactions)
       .forEach((transaction) => byId.set(transaction.id, transaction));
     return [...byId.values()];
   }, [query.data]);
@@ -79,17 +69,18 @@ export default function TransactionsScreen() {
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       if (filter === "All") return true;
-      if (filter === "Sent") return tx.direction === "debit";
-      if (filter === "Received") return tx.direction === "credit";
+      const outgoing = isOutgoing(tx, accountId);
+      if (filter === "Sent") return outgoing;
+      if (filter === "Received") return !outgoing;
       return true;
     });
-  }, [transactions, filter]);
+  }, [transactions, filter, accountId]);
 
   const renderItem = ({ item }: { item: Transaction }) => {
-    const isCredit = item.direction === "credit";
+    const isCredit = !isOutgoing(item, accountId);
     const direction = isCredit ? "up" : "down";
     const amountLabel = `${isCredit ? "+" : "-"}${koboToNaira(
-      Math.abs(parseInt(item.amount as any)),
+      Math.abs(item.amount),
     )}`;
     const date = new Date(item.createdAt).toLocaleDateString("en-NG", {
       month: "short",
@@ -108,12 +99,11 @@ export default function TransactionsScreen() {
       >
         <View className="flex-row justify-between items-start mb-3 gap-3">
           <View className="flex-1 min-w-0">
-            <Text
+            <CounterpartyName
+              transaction={item}
+              accountId={accountId}
               className="text-black font-satoshi-bold text-base"
-              numberOfLines={2}
-            >
-              {item.squad_ref}
-            </Text>
+            />
             <Text
               className="text-grey-500 font-satoshi-regular text-xs mt-1"
               numberOfLines={2}

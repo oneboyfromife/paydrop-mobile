@@ -1,6 +1,7 @@
 import { useIsFocused } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { onDiscoveryRevoked } from "../lib/discoveryEvents";
 import { getQrCode } from "../services/user";
 import { useUserStore } from "../store/userStore";
 import { readExpiresAt } from "../utils/apiPayload";
@@ -38,6 +39,14 @@ export const useReceiveQr = (enabled = true) => {
               10000,
           ),
   });
+  const { refetch } = query;
+  useEffect(() => {
+    if (!active) return;
+    // A Bluetooth revoke is account-wide and kills the QR token too: issue a new one.
+    return onDiscoveryRevoked(() => {
+      void refetch();
+    });
+  }, [active, refetch]);
   useEffect(() => {
     if (!active) return;
     setNow(Date.now());

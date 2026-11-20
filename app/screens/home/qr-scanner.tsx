@@ -68,10 +68,15 @@ export default function QRScannerScreen() {
       useTransferStore.getState().selectRecipient(recipient);
       router.push("/screens/payment/recipient-preview" as any);
     },
-    onError: (_error, { requestEpoch }) => {
+    onError: (error, { requestEpoch }) => {
       if (requestEpoch !== epoch.current) return;
+      const code = (error as { code?: string | null }).code;
       setError(
-        "Unable to resolve this recipient. Check your connection and use a current code.",
+        code === "TOKEN_INVALID" || code === "TOKEN_EXPIRED"
+          ? (error as { message: string }).message
+          : error instanceof Error
+            ? error.message
+            : "Unable to resolve this recipient. Check your connection and use a current code.",
       );
       isProcessingRef.current = false;
       setScanLocked(false);

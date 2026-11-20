@@ -43,7 +43,59 @@ export default function FraudDetailModal({
     return "bg-red-50";
   };
 
-  const fraudData = data?.data || data;
+  // FraudDetailDto: { score, verdict, reason, features, source?, scored_at?, note? }
+  const fraud = (data ?? {}) as {
+    score?: number;
+    verdict?: string;
+    reason?: string;
+    features?: {
+      amount_vs_baseline?: number;
+      velocity_1hr?: number;
+      recipient_first_time?: boolean;
+      time_anomaly?: boolean;
+      account_name_match?: boolean;
+    };
+  };
+  const score = typeof fraud.score === "number" ? fraud.score : 0;
+  const features = fraud.features ?? {};
+  const signals: { label: string; value: string; risky: boolean; icon: any }[] =
+    [
+      typeof features.amount_vs_baseline === "number" && {
+        label: "Amount vs your usual",
+        value: `${features.amount_vs_baseline.toFixed(1)}×`,
+        risky: features.amount_vs_baseline >= 2,
+        icon: "trending-up-outline",
+      },
+      typeof features.velocity_1hr === "number" && {
+        label: "Payments in the last hour",
+        value: String(features.velocity_1hr),
+        risky: features.velocity_1hr >= 3,
+        icon: "speedometer-outline",
+      },
+      typeof features.recipient_first_time === "boolean" && {
+        label: "First payment to this person",
+        value: features.recipient_first_time ? "Yes" : "No",
+        risky: features.recipient_first_time,
+        icon: "person-add-outline",
+      },
+      typeof features.time_anomaly === "boolean" && {
+        label: "Unusual time of day",
+        value: features.time_anomaly ? "Yes" : "No",
+        risky: features.time_anomaly,
+        icon: "time-outline",
+      },
+      typeof features.account_name_match === "boolean" && {
+        label: "Account name matches",
+        value: features.account_name_match ? "Yes" : "No",
+        risky: !features.account_name_match,
+        icon: "id-card-outline",
+      },
+    ].filter(Boolean) as {
+      label: string;
+      value: string;
+      risky: boolean;
+      icon: any;
+    }[];
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
@@ -92,155 +144,70 @@ export default function FraudDetailModal({
               <View className="items-center mb-8">
                 <View
                   className={`w-32 h-32 rounded-full items-center justify-center border-4 ${
-                    fraudData?.fraud_score < 30
+                    score < 30
                       ? "border-green-100"
-                      : fraudData?.fraud_score < 70
+                      : score < 70
                         ? "border-yellow-100"
                         : "border-red-100"
                   }`}
                 >
                   <Text
-                    className={`text-4xl font-satoshi-bold ${getScoreColor(
-                      fraudData?.fraud_score || 0,
-                    )}`}
+                    className={`text-4xl font-satoshi-bold ${getScoreColor(score)}`}
                   >
-                    {fraudData?.fraud_score || 0}
+                    {score}
                   </Text>
                   <Text className="text-grey-400 font-satoshi-medium text-xs">
                     RISK SCORE
                   </Text>
                 </View>
                 <View
-                  className={`mt-4 px-4 py-1.5 rounded-full ${getScoreBg(
-                    fraudData?.fraud_score || 0,
-                  )}`}
+                  className={`mt-4 px-4 py-1.5 rounded-full ${getScoreBg(score)}`}
                 >
                   <Text
-                    className={`font-satoshi-bold text-sm ${getScoreColor(
-                      fraudData?.fraud_score || 0,
-                    )}`}
+                    className={`font-satoshi-bold text-sm ${getScoreColor(score)}`}
                   >
-                    {fraudData?.fraud_verdict?.toUpperCase() || "UNKNOWN"}
+                    {fraud.verdict?.toUpperCase() || "UNKNOWN"}
                   </Text>
                 </View>
+                {fraud.reason ? (
+                  <Text className="mt-4 text-grey-600 font-satoshi-regular text-sm text-center">
+                    {fraud.reason}
+                  </Text>
+                ) : null}
               </View>
 
-              <View className="space-y-6">
-                {/* Risk Factors */}
-                <View>
-                  <Text className="text-black font-satoshi-bold text-base mb-3">
-                    Risk Indicators
-                  </Text>
-                  <View className="bg-grey-50 rounded-2xl p-4 border border-grey-100">
-                    {fraudData?.risk_factors?.length > 0 ? (
-                      fraudData.risk_factors.map(
-                        (factor: string, index: number) => (
-                          <View
-                            key={index}
-                            className="flex-row items-start mb-2 last:mb-0"
-                          >
-                            <Ionicons
-                              name="warning-outline"
-                              size={16}
-                              color="#F59E0B"
-                              style={{ marginTop: 2 }}
-                            />
-                            <Text className="ml-2 text-grey-700 font-satoshi-regular text-sm flex-1">
-                              {factor}
-                            </Text>
-                          </View>
-                        ),
-                      )
-                    ) : (
-                      <View className="flex-row items-center">
-                        <Ionicons
-                          name="checkmark-circle-outline"
-                          size={18}
-                          color="#10B981"
-                        />
-                        <Text className="ml-2 text-green-600 font-satoshi-medium text-sm">
-                          No significant risk factors detected
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Device Info */}
-                <View className="mt-6">
-                  <Text className="text-black font-satoshi-bold text-base mb-3">
-                    Device Details
-                  </Text>
+              <View>
+                <Text className="text-black font-satoshi-bold text-base mb-3">
+                  Risk signals
+                </Text>
+                {signals.length > 0 ? (
                   <View className="bg-white rounded-2xl border border-grey-100 overflow-hidden">
-                    <DetailRow
-                      label="Device Model"
-                      value={fraudData?.device_info?.model || "Unknown"}
-                      icon="phone-portrait-outline"
-                    />
-                    <DetailRow
-                      label="OS Version"
-                      value={fraudData?.device_info?.os || "Unknown"}
-                      icon="settings-outline"
-                    />
-                    <DetailRow
-                      label="IP Address"
-                      value={fraudData?.ip_address || "Unknown"}
-                      icon="globe-outline"
-                    />
-                    <DetailRow
-                      label="Location"
-                      value={
-                        fraudData?.location
-                          ? `${fraudData.location.city}, ${fraudData.location.country}`
-                          : "Unknown"
-                      }
-                      icon="location-outline"
-                      isLast
-                    />
+                    {signals.map((signal, index) => (
+                      <DetailRow
+                        key={signal.label}
+                        label={signal.label}
+                        value={signal.value}
+                        icon={signal.icon}
+                        valueColor={
+                          signal.risky ? "text-red-600" : "text-green-600"
+                        }
+                        isLast={index === signals.length - 1}
+                      />
+                    ))}
                   </View>
-                </View>
-
-                {/* Network Info */}
-                {fraudData?.network_info && (
-                  <View className="mt-6">
-                    <Text className="text-black font-satoshi-bold text-base mb-3">
-                      Network Analysis
+                ) : (
+                  <View className="bg-grey-50 rounded-2xl p-4 border border-grey-100 flex-row items-center">
+                    <Ionicons
+                      name="checkmark-circle-outline"
+                      size={18}
+                      color="#10B981"
+                    />
+                    <Text className="ml-2 text-green-600 font-satoshi-medium text-sm">
+                      No significant risk signals recorded
                     </Text>
-                    <View className="bg-white rounded-2xl border border-grey-100 overflow-hidden">
-                      <DetailRow
-                        label="VPN Detected"
-                        value={fraudData.network_info.vpn ? "Yes" : "No"}
-                        icon="shield-checkmark-outline"
-                        valueColor={
-                          fraudData.network_info.vpn
-                            ? "text-red-600"
-                            : "text-green-600"
-                        }
-                      />
-                      <DetailRow
-                        label="Proxy Detected"
-                        value={fraudData.network_info.proxy ? "Yes" : "No"}
-                        icon="swap-horizontal-outline"
-                        valueColor={
-                          fraudData.network_info.proxy
-                            ? "text-red-600"
-                            : "text-green-600"
-                        }
-                        isLast
-                      />
-                    </View>
                   </View>
                 )}
               </View>
-
-              <TouchableOpacity
-                onPress={onClose}
-                className="mt-10 bg-black h-14 rounded-2xl items-center justify-center"
-              >
-                <Text className="text-white font-satoshi-bold text-base">
-                  Dismiss
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
           )}
         </View>

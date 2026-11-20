@@ -23,7 +23,6 @@ function setup(t, overrides = {}) {
   let observe;
   let seed = 1;
   const driver = {
-    randomUUID: () => uuid(seed++),
     prepare: async () => {},
     startScan: (cb) => {
       observe = cb;
@@ -36,9 +35,10 @@ function setup(t, overrides = {}) {
     stopAdvertising: async () => {
       calls.push("stop");
     },
-    register: async (token) => {
+    register: async () => {
+      const token = uuid(seed++);
       calls.push(`register:${token}`);
-      return { expiresAt: Date.now() + 180000 };
+      return { token, expiresAt: Date.now() + 180000 };
     },
     revoke: async () => {
       calls.push("revoke");
@@ -261,7 +261,7 @@ test("late registration cannot restart advertising after server expiry", async (
   let count = 0;
   const { controller, calls } = setup(t, {
     register: async () =>
-      ++count === 1 ? { expiresAt: Date.now() + 180000 } : renewal.promise,
+      ++count === 1 ? { token: uuid(90), expiresAt: Date.now() + 180000 } : renewal.promise,
   });
   controller.acquire("advertise");
   await controller.settled();
@@ -271,8 +271,27 @@ test("late registration cannot restart advertising after server expiry", async (
   await drain();
   assert.equal(controller.getSnapshot().isAdvertising, false);
   assert.match(controller.getSnapshot().error, /expired/);
-  renewal.resolve({ expiresAt: Date.now() + 180000 });
+  renewal.resolve({ token: uuid(90), expiresAt: Date.now() + 180000 });
   await drain();
   await controller.settled();
   assert.equal(calls.filter((call) => call.startsWith("advertise:")).length, 1);
+});
+test("the advertised UUID is the server-issued token", async (t) => {
+  const { controller, calls } = setup(t);
+  controller.acquire("advertise");
+  await controller.settled();
+  assert.deepEqual(
+    calls.filter((x) => x.startsWith("register:") || x.startsWith("advertise:")),
+    [`register:${uuid(1)}`, `advertise:${uuid(1)}`],
+  );
+});
+test("a malformed server-issued token is never advertised", async (t) => {
+  const bad = setup(t, {
+    register: async () => ({ token: "not-a-uuid", expiresAt: Date.now() + 180000 }),
+  });
+  bad.controller.acquire("advertise");
+  await bad.controller.settled();
+  assert.equal(bad.calls.filter((x) => x.startsWith("advertise:")).length, 0);
+  assert.equal(bad.controller.getSnapshot().isAdvertising, false);
+  assert.match(bad.controller.getSnapshot().error ?? "", /Bluetooth|QR/);
 });

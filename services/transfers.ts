@@ -6,7 +6,37 @@ import {
   useTransferStore,
 } from "../store/transferStore";
 import { isUnresolved, type TransferIntent } from "../types/transfer";
+import { asRecord, toApiError } from "../utils/apiPayload";
 import { interpretTransferResponse } from "../utils/transferResponse";
+
+/** Statuses where the server refused the request before moving any money. */
+const REJECTED_STATUSES = [400, 403, 422, 429];
+
+/**
+ * Only an explicit server answer can end a payment. BLOCK arrives as HTTP 422 with the
+ * verdict in the body; other 4xx refusals end the attempt as failed. Timeouts, 5xx and
+ * 409 (already processing) stay uncertain and are resolved by GET recovery.
+ */
+const definitiveRejection = (
+  error: unknown,
+  source: "submit" | "confirm",
+): Partial<TransferIntent> | null => {
+  const response = asRecord(asRecord(error).response);
+  const status = response.status;
+  if (typeof status !== "number" || !REJECTED_STATUSES.includes(status))
+    return null;
+  const body = asRecord(response.data);
+  const carrier = [body, asRecord(body.data), asRecord(body.details)].find(
+    (record) => typeof record.verdict === "string",
+  );
+  if (carrier && String(carrier.verdict).toUpperCase() === "BLOCK")
+    return interpretTransferResponse(carrier, source);
+  return {
+    phase: "failed",
+    flag: undefined,
+    message: toApiError(error, "This payment could not be sent.").message,
+  };
+};
 
 let mutation: Promise<void> | null = null;
 let recovery: Promise<void> | null = null;
@@ -18,13 +48,18 @@ const submissionEnabled = () =>
   !!process.env.EXPO_PUBLIC_TRANSFER_KEY_LOOKUP_PATH?.startsWith("/") &&
   !!process.env.EXPO_PUBLIC_TRANSFER_KEY_LOOKUP_PATH?.includes(":key");
 
-async function applyResponse(
+const applyResponse = (
   intent: TransferIntent,
   data: unknown,
   source: "submit" | "confirm" | "status",
+) => applyUpdate(intent, interpretTransferResponse(data, source), source);
+
+async function applyUpdate(
+  intent: TransferIntent,
+  update: Partial<TransferIntent>,
+  source: "submit" | "confirm" | "status",
 ) {
   if (!current(intent)) return;
-  const update = interpretTransferResponse(data, source);
   const active = useTransferStore.getState().active!;
   if (!isUnresolved(active.phase)) return;
   if (
@@ -113,7 +148,9 @@ export const submitTransfer = (): Promise<void> => {
         { headers: { "Idempotency-Key": intent.idempotencyKey } },
       );
       await applyResponse(intent, response.data, "submit");
-    } catch {
+    } catch (error) {
+      const rejection = definitiveRejection(error, "submit");
+      if (rejection) return applyUpdate(intent, rejection, "submit");
       if (current(intent))
         useTransferStore.setState({
           active: {
@@ -144,6 +181,7 @@ export const confirmFlaggedTransfer = (): Promise<void> => {
     !current(intent) ||
     intent.phase !== "flagged" ||
     !intent.flag ||
+    !intent.transactionId ||
     intent.flag.expiresAt <= Date.now()
   )
     return Promise.reject(new Error("Approval expired. Check payment status."));
@@ -165,11 +203,16 @@ export const confirmFlaggedTransfer = (): Promise<void> => {
     try {
       const response = await api.post(
         "/transactions/transfer/confirm",
-        { confirm_token: intent.flag!.token },
+        {
+          transaction_id: intent.transactionId,
+          confirm_token: intent.flag!.token,
+        },
         { headers: { "Idempotency-Key": `${intent.idempotencyKey}.confirm` } },
       );
       await applyResponse(intent, response.data, "confirm");
-    } catch {
+    } catch (error) {
+      const rejection = definitiveRejection(error, "confirm");
+      if (rejection) return applyUpdate(intent, rejection, "confirm");
       if (current(intent))
         useTransferStore.setState({
           active: {

@@ -1,9 +1,16 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { Text, TextInput } from "@/components/shared";
-import { requestOtp } from "@/services/auth";
+import { startSession } from "@/lib/session";
+import {
+  getTestAccounts,
+  isTestAuthEnabled,
+  requestOtp,
+  testLogin,
+} from "@/services/auth";
+import type { ApiError } from "@/utils/apiPayload";
 import size from "@/utils/size";
 import { showToast } from "@/utils/toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 
@@ -23,26 +30,47 @@ export default function LoginScreen() {
   const router = useRouter();
   const [phone, setPhone] = useState("");
 
+  const [notFound, setNotFound] = useState(false);
   const { mutate, isPending } = useMutation({
     mutationFn: (formattedPhone: string) => requestOtp("login", formattedPhone),
-    onSuccess: (_, formattedPhone) => {
+    onSuccess: ({ resendAfter }, formattedPhone) => {
       router.push({
         pathname: "./otp",
         params: {
           phone: formattedPhone,
           mode: "login",
+          resendAfter: String(resendAfter),
         },
       });
     },
-    onError: (error: any) => {
-      showToast.error(
-        "Login Failed",
-        error?.message || "Something went wrong. Please try again.",
-      );
+    onError: (error: ApiError) => {
+      if (error.code === "ACCOUNT_NOT_FOUND") {
+        setNotFound(true);
+        return;
+      }
+      showToast.error("Login Failed", error.message);
     },
   });
 
+  const testMode = isTestAuthEnabled();
+  const testAccounts = useQuery({
+    queryKey: ["test-accounts"],
+    queryFn: getTestAccounts,
+    enabled: testMode,
+    retry: 1,
+  });
+  const testLoginMutation = useMutation({
+    mutationFn: testLogin,
+    onSuccess: (session) => {
+      startSession(session);
+      router.replace("/(tabs)/home");
+    },
+    onError: (error: ApiError) =>
+      showToast.error("Test login failed", error.message),
+  });
+
   const handleSubmit = () => {
+    setNotFound(false);
     const formattedPhone = phone.startsWith("0") ? phone : `0${phone}`;
     mutate(formattedPhone);
   };
@@ -98,9 +126,25 @@ export default function LoginScreen() {
                     maxLength={10}
                     className="flex-1 h-full font-satoshi-regular text-black"
                     value={phone}
-                    onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
+                    onChangeText={(text) => {
+                      setNotFound(false);
+                      setPhone(text.replace(/\D/g, ""));
+                    }}
                   />
                 </View>
+                {notFound && (
+                  <TouchableOpacity
+                    onPress={() => router.push("/(auth)/register")}
+                    className="mb-3 ml-2"
+                  >
+                    <Text className="font-satoshi-regular text-sm text-red-600">
+                      No account uses this number.{" "}
+                      <Text className="text-purple-500 underline">
+                        Create one
+                      </Text>
+                    </Text>
+                  </TouchableOpacity>
+                )}
 
                 <TouchableOpacity
                   className={`h-16 rounded-full justify-center items-center ${
@@ -131,6 +175,40 @@ export default function LoginScreen() {
                     </Text>
                   </Text>
                 </TouchableOpacity>
+
+                {testMode && (
+                  <View className="mt-8 border border-dashed border-purple-300 rounded-2xl p-4">
+                    <Text className="font-satoshi-bold text-purple-500 mb-1">
+                      Test login (no SMS)
+                    </Text>
+                    <Text className="font-satoshi-regular text-xs text-neutral-500 mb-3">
+                      Shown because EXPO_PUBLIC_AUTH_TEST_MODE is on.
+                    </Text>
+                    {testAccounts.isLoading && (
+                      <ActivityIndicator size="small" color="#6C63FF" />
+                    )}
+                    {testAccounts.error && (
+                      <Text className="font-satoshi-regular text-xs text-red-600">
+                        Test accounts unavailable on this server.
+                      </Text>
+                    )}
+                    {(testAccounts.data ?? []).map((account) => (
+                      <TouchableOpacity
+                        key={account.index}
+                        disabled={testLoginMutation.isPending}
+                        onPress={() =>
+                          testLoginMutation.mutate(String(account.index))
+                        }
+                        className="h-12 rounded-full bg-purple-100 justify-center px-5 mb-2"
+                      >
+                        <Text className="font-satoshi-medium text-purple-500">
+                          {account.first_name} {account.last_name} · @
+                          {account.username}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
           </ScrollView>

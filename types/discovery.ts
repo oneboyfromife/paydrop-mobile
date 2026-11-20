@@ -18,6 +18,8 @@ export interface NearbyUser extends DiscoveryProfile {
 }
 
 export interface DiscoveryRegistration {
+  /** Server-issued UUID to advertise. */
+  token: string;
   expiresAt: number;
 }
 

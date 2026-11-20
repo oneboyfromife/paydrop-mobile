@@ -2,6 +2,14 @@ import type { TransferIntent } from "../types/transfer";
 import { unwrapData, asRecord, readExpiresAt } from "./apiPayload";
 import { parseDiscoveryProfile } from "./discoveryProfile";
 
+/**
+ * The FLAG response carries no expiry; the API documents a 15-minute confirm_token
+ * lifetime (POST /transactions/transfer/confirm). We stop 30 s early so an approval
+ * is never sent with a token the server has just expired.
+ */
+export const FLAG_CONFIRM_TTL_MS = 15 * 60 * 1000;
+export const FLAG_CONFIRM_MARGIN_MS = 30 * 1000;
+
 export const interpretTransferResponse = (
   value: unknown,
   source: "submit" | "confirm" | "status",
@@ -14,7 +22,7 @@ export const interpretTransferResponse = (
   const transactionId = text("id") ?? text("transaction_id");
   const verdict = (text("verdict") ?? text("fraud_verdict"))?.toUpperCase();
   const status = text("status")?.toUpperCase();
-  const message = text("fraud_reason") ?? text("message");
+  const message = text("reason") ?? text("fraud_reason") ?? text("message");
   const recipient = parseDiscoveryProfile(record.recipient);
   const result: Partial<TransferIntent> = {
     ...(transactionId ? { transactionId } : {}),
@@ -26,7 +34,7 @@ export const interpretTransferResponse = (
       ? { amount: record.amount }
       : {}),
   };
-  if (verdict === "BLOCK")
+  if (verdict === "BLOCK" || status === "BLOCKED")
     return {
       ...result,
       phase: "blocked",
@@ -34,7 +42,9 @@ export const interpretTransferResponse = (
     };
   if (verdict === "FLAG" && status !== "COMPLETED") {
     const token = text("confirm_token");
-    const expiresAt = readExpiresAt(record, now);
+    const expiresAt =
+      readExpiresAt(record, now) ??
+      (token ? now + FLAG_CONFIRM_TTL_MS - FLAG_CONFIRM_MARGIN_MS : null);
     if (token && expiresAt && expiresAt > now)
       return {
         ...result,
