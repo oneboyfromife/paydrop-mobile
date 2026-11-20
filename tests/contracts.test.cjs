@@ -133,3 +133,64 @@ test("BLOCK and expired/malformed FLAG cannot be confirmed", () => {
   assert.equal(result.phase, "flagged");
   assert.equal(result.flag.expiresAt, 61000);
 });
+test("API error envelope exposes status, code and message; network failures get a connection message", () => {
+  const { toApiError } = require("../utils/apiPayload.ts");
+  assert.deepEqual(
+    toApiError({
+      response: {
+        status: 404,
+        data: {
+          success: false,
+          code: "ACCOUNT_NOT_FOUND",
+          message: "No account",
+          details: { phone: "+2348000000001" },
+        },
+      },
+    }),
+    {
+      status: 404,
+      code: "ACCOUNT_NOT_FOUND",
+      message: "No account",
+      details: { phone: "+2348000000001" },
+    },
+  );
+  const offline = toApiError(new Error("Network Error"));
+  assert.equal(offline.status, null);
+  assert.match(offline.message, /connection/);
+});
+test("transfer responses follow the Swagger field names inside the success envelope", () => {
+  const blocked = interpretTransferResponse(
+    { success: true, data: { status: "BLOCKED", verdict: "BLOCK", reason: "Risky" } },
+    "submit",
+  );
+  assert.equal(blocked.phase, "blocked");
+  assert.equal(blocked.message, "Risky");
+  const allowed = interpretTransferResponse(
+    { success: true, data: { transaction_id: "tx", verdict: "ALLOW", status: "COMPLETED" } },
+    "submit",
+  );
+  assert.equal(allowed.phase, "completed");
+  assert.equal(allowed.transactionId, "tx");
+  const pending = interpretTransferResponse(
+    { success: true, data: { id: "tx", status: "PENDING", fraud_verdict: "ALLOW" } },
+    "status",
+  );
+  assert.equal(pending.phase, "processing");
+  const flaggedWithoutToken = interpretTransferResponse(
+    { data: { transaction_id: "tx", verdict: "FLAG", status: "PENDING_REVIEW" } },
+    "submit",
+  );
+  assert.equal(flaggedWithoutToken.phase, "unknown");
+});
+test("server-issued session parsing requires both tokens and a user id", () => {
+  const { parseSession } = require("../services/auth.ts");
+  const session = parseSession({
+    success: true,
+    data: { accessToken: "a", refreshToken: "r", user: { id: "u" }, wallet: {} },
+  });
+  assert.equal(session.user.id, "u");
+  assert.throws(
+    () => parseSession({ data: { accessToken: "a", user: { id: "u" } } }),
+    (error) => error.code === "INVALID_SESSION",
+  );
+});

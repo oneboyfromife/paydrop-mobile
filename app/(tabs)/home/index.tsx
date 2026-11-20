@@ -1,14 +1,21 @@
 import { Text } from "@/components/shared";
 import FraudDetailModal from "@/components/sections/FraudDetailModal";
 import QRModal from "@/components/sections/QRModal";
-import { getMe, getTransactions, getWalletBalance } from "@/services/user";
+import CounterpartyName from "@/components/sections/CounterpartyName";
+import {
+  getMe,
+  getTransactions,
+  getWalletAccount,
+  getWalletBalance,
+} from "@/services/user";
 import { useUserStore } from "@/store/userStore";
 import {
   useTransferStore,
   hydrateTransferRecovery,
 } from "@/store/transferStore";
+import { isOutgoing, type Transaction } from "@/types/api";
 import { isUnresolved } from "@/types/transfer";
-import { formatNaira, koboToNaira } from "@/utils/currency";
+import { koboToNaira } from "@/utils/currency";
 import size from "@/utils/size";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,49 +28,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-interface User {
-  id: string;
-  phone?: string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  email?: string | null;
-  avatar_url?: string | null;
-  squad_virtual_account?: string | null;
-  squad_bank_code?: string | null;
-  kyc_verified?: boolean;
-  balance?: number;
-  wallet_balance?: number;
-}
-
-interface Transaction {
-  id: string;
-  sender_id: string;
-  recipient_id: string;
-  amount: number;
-  status: string;
-  note: string;
-  squad_ref: string;
-  fraud_score: number;
-  fraud_verdict: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-const DEFAULT_USER: User = {
-  id: "0",
-  phone: "",
-  first_name: "",
-  last_name: "",
-  username: "",
-  email: "",
-  avatar_url: "",
-  squad_virtual_account: "",
-  squad_bank_code: "",
-  kyc_verified: false,
-  balance: 0,
-};
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -101,7 +65,7 @@ export default function HomeScreen() {
     error: transactionsError,
   } = useQuery({
     queryKey: ["transactions", accessToken],
-    queryFn: () => getTransactions(0, 10),
+    queryFn: () => getTransactions(1, 10),
     enabled: !!accessToken,
     retry: 1,
   });
@@ -118,11 +82,17 @@ export default function HomeScreen() {
     retry: 1,
   });
 
-  const user =
-    accessToken && userData ? userData?.data || userData : DEFAULT_USER;
+  const { data: walletAccount } = useQuery({
+    queryKey: ["wallet-account", accountId],
+    queryFn: getWalletAccount,
+    enabled: !!accessToken && !!userData?.squad_virtual_account,
+    retry: 1,
+  });
+
+  const user = accessToken ? userData : undefined;
   useEffect(() => {
-    if (user?.id && user.id === accountId)
-      useUserStore.getState().setUser(user);
+    if (userData?.id && userData.id === accountId)
+      useUserStore.getState().setUser(userData);
   }, [userData, accountId]);
 
   const handleRefresh = async () => {
@@ -147,12 +117,10 @@ export default function HomeScreen() {
     refetchingBalance;
   const error = userError || transactionsError || balanceError;
 
-  const walletBalance = balanceData?.data?.balance || "";
+  // Kobo from /wallet/balance, falling back to the wallet embedded in /users/me.
+  const walletBalance = balanceData?.balance ?? userData?.wallet?.balance;
 
-  const transactions: Transaction[] =
-    transactionsData?.transactions ??
-    transactionsData?.data?.transactions ??
-    [];
+  const transactions: Transaction[] = transactionsData?.transactions ?? [];
   const recentTransactions = transactions.slice(0, 3);
 
   return (
@@ -193,7 +161,9 @@ export default function HomeScreen() {
             </Text>
             <View className="flex-row items-baseline">
               <Text className="text-white font-satoshi-bold text-4xl">
-                {formatNaira(walletBalance)}
+                {typeof walletBalance === "number"
+                  ? koboToNaira(walletBalance)
+                  : "—"}
               </Text>
             </View>
             <View className="bg-purple-600 px-4 py-1.5 rounded-full mt-4">
@@ -224,20 +194,28 @@ export default function HomeScreen() {
           </View>
 
           <TouchableOpacity
-            // onPress={handleCopyAccountNumber}
+            onPress={() => router.push("/screens/home/topup")}
             className="bg-white/10 rounded-3xl px-4 py-5"
           >
             <Text className="text-purple-100 font-satoshi-medium text-sm mb-2">
               Account Number
             </Text>
-            <Text className="text-white font-satoshi-bold text-2xl">
-              {user?.squad_virtual_account ?? ""}
-            </Text>
-            <Text className="text-purple-200 font-satoshi-regular text-sm mt-1">
-              {user?.squad_bank_code
-                ? `GTBank • ${user.squad_bank_code}`
-                : "GTBank"}
-            </Text>
+            {user?.squad_virtual_account ? (
+              <>
+                <Text className="text-white font-satoshi-bold text-2xl">
+                  {walletAccount?.virtual_account_number ??
+                    user.squad_virtual_account}
+                </Text>
+                <Text className="text-purple-200 font-satoshi-regular text-sm mt-1">
+                  {walletAccount?.bank_name ?? "Bank details loading"}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-white font-satoshi-medium text-base">
+                No account number yet. It is issued once your identity is
+                verified.
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -318,6 +296,7 @@ export default function HomeScreen() {
                 <TransactionItem
                   key={transaction.id}
                   transaction={transaction}
+                  accountId={accountId}
                   onPress={() => {
                     setSelectedTxId(transaction.id);
                     setIsFraudModalVisible(true);
@@ -366,13 +345,17 @@ function ActionItem({
 
 function TransactionItem({
   transaction,
+  accountId,
   onPress,
 }: {
   transaction: Transaction;
+  accountId?: string;
   onPress: () => void;
 }) {
-  const direction = transaction.amount >= 0 ? "up" : "down";
-  const amountLabel = `${transaction.amount >= 0 ? "+" : "-"}${koboToNaira(Math.abs(transaction.amount))}`;
+  // Amounts are always positive; direction comes from who sent it.
+  const outgoing = isOutgoing(transaction, accountId);
+  const direction = outgoing ? "up" : "down";
+  const amountLabel = `${outgoing ? "-" : "+"}${koboToNaira(Math.abs(transaction.amount))}`;
   const date = new Date(transaction.createdAt).toLocaleDateString("en-NG", {
     month: "short",
     day: "numeric",
@@ -401,12 +384,11 @@ function TransactionItem({
             />
           </View>
           <View className="flex-1 min-w-0">
-            <Text
+            <CounterpartyName
+              transaction={transaction}
+              accountId={accountId}
               className="text-black font-satoshi-bold text-base"
-              numberOfLines={2}
-            >
-              {transaction.squad_ref}
-            </Text>
+            />
             <Text
               className="text-grey-500 font-satoshi-regular text-xs mt-1"
               numberOfLines={1}
@@ -416,7 +398,7 @@ function TransactionItem({
           </View>
         </View>
         <Text
-          className={`font-satoshi-bold text-base shrink-0 ${direction === "up" ? "text-green-600" : "text-red-600"}`}
+          className={`font-satoshi-bold text-base shrink-0 ${outgoing ? "text-red-600" : "text-green-600"}`}
         >
           {amountLabel}
         </Text>

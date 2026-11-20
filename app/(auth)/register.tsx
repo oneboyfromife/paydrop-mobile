@@ -1,8 +1,13 @@
 import ScreenView from "@/components/layout/ScreenView";
 import { Text, TextInput } from "@/components/shared";
+import { checkAvailability, requestOtp } from "@/services/auth";
+import type { ApiError } from "@/utils/apiPayload";
+import { showToast } from "@/utils/toast";
+import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -12,6 +17,10 @@ import {
   View,
 } from "react-native";
 
+const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type Field = "phone" | "email" | "username";
+
 export default function PhoneScreen() {
   const router = useRouter();
   const [firstName, setFirstName] = useState("");
@@ -19,29 +28,79 @@ export default function PhoneScreen() {
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
 
+  const trimmedEmail = email.trim().toLowerCase();
   const isFormValid =
     phone.length === 10 &&
     firstName.trim() !== "" &&
     lastName.trim() !== "" &&
-    email.trim() !== "" &&
-    username.trim().length >= 3;
+    USERNAME_RE.test(username) &&
+    (trimmedEmail === "" || EMAIL_RE.test(trimmedEmail));
 
-  const handleSubmit = () => {
-    if (isFormValid) {
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      const formattedPhone = `0${phone}`;
+      const availability = await checkAvailability({
+        phone: formattedPhone,
+        username,
+        ...(trimmedEmail ? { email: trimmedEmail } : {}),
+      });
+      const problems: Partial<Record<Field, string>> = {};
+      if (availability.phone === "taken")
+        problems.phone = "This number already has an account. Log in instead.";
+      else if (availability.phone === "invalid")
+        problems.phone = "Enter a valid Nigerian mobile number.";
+      if (availability.username === "taken")
+        problems.username = "That username is taken.";
+      else if (availability.username === "invalid")
+        problems.username = "3-20 characters: a-z, 0-9, underscore or dot.";
+      if (trimmedEmail && availability.email === "taken")
+        problems.email = "That email is already in use.";
+      else if (trimmedEmail && availability.email === "invalid")
+        problems.email = "Enter a valid email address.";
+      if (Object.keys(problems).length) return { problems };
+      const { resendAfter } = await requestOtp("signup", formattedPhone);
+      return { formattedPhone, resendAfter };
+    },
+    onSuccess: (result) => {
+      if ("problems" in result) {
+        setErrors(result.problems ?? {});
+        return;
+      }
       router.push({
-        pathname: "/kyc",
+        pathname: "/otp",
         params: {
-          phone: `0${phone}`,
+          phone: result.formattedPhone,
           mode: "signup",
-          firstName,
-          lastName,
-          email,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           username,
+          email: trimmedEmail,
+          resendAfter: String(result.resendAfter),
         },
       });
-    }
+    },
+    onError: (error: ApiError) => {
+      if (error.code === "ACCOUNT_EXISTS") {
+        setErrors({ phone: error.message });
+        return;
+      }
+      showToast.error("Could not continue", error.message);
+    },
+  });
+
+  const handleSubmit = () => {
+    setErrors({});
+    if (isFormValid && !isPending) mutate();
   };
+
+  const fieldError = (field: Field) =>
+    errors[field] ? (
+      <Text className="text-red-600 font-satoshi-regular text-xs -mt-2 mb-3 ml-2">
+        {errors[field]}
+      </Text>
+    ) : null;
 
   return (
     <ScreenView>
@@ -67,7 +126,7 @@ export default function PhoneScreen() {
                 Register
               </Text>
               <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
-                Create an account using your phone number, name, and email.
+                Create an account with your phone number and name. Email is optional.
               </Text>
 
               <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-4 border border-grey-200">
@@ -92,7 +151,7 @@ export default function PhoneScreen() {
 
               <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-4 border border-grey-200">
                 <TextInput
-                  placeholder="Email Address"
+                  placeholder="Email Address (optional)"
                   placeholderTextColor="#9CA3AF"
                   autoCorrect={false}
                   keyboardType="email-address"
@@ -102,6 +161,7 @@ export default function PhoneScreen() {
                   onChangeText={setEmail}
                 />
               </View>
+              {fieldError("email")}
 
               <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-4 border border-grey-200">
                 <TextInput
@@ -111,9 +171,13 @@ export default function PhoneScreen() {
                   autoCapitalize="none"
                   className="flex-1 h-full font-satoshi-regular text-black"
                   value={username}
-                  onChangeText={setUsername}
+                  maxLength={20}
+                  onChangeText={(text) =>
+                    setUsername(text.toLowerCase().replace(/[^a-z0-9_.]/g, ""))
+                  }
                 />
               </View>
+              {fieldError("username")}
 
               <View className="bg-grey-50 h-16 rounded-xl flex-row items-center px-6 mb-4 border border-grey-200">
                 <Text className="text-lg font-satoshi-medium mr-4">+234</Text>
@@ -128,28 +192,23 @@ export default function PhoneScreen() {
                   onChangeText={(text) => setPhone(text.replace(/\D/g, ""))}
                 />
               </View>
-
-              {/* <View className="bg-grey-50 h-16 rounded-xl justify-center px-6 mb-6 border border-grey-200">
-              <TextInput
-                placeholder="Avatar URL (optional)"
-                placeholderTextColor="#9CA3AF"
-                className="text-lg font-satoshi-regular text-black"
-                value={avatarUrl}
-                onChangeText={setAvatarUrl}
-              />
-            </View> */}
+              {fieldError("phone")}
 
               <TouchableOpacity
                 activeOpacity={0.6}
                 className={`h-16 rounded-2xl justify-center items-center ${
-                  isFormValid ? "bg-purple-500" : "bg-purple-300"
+                  isFormValid && !isPending ? "bg-purple-500" : "bg-purple-300"
                 }`}
                 onPress={handleSubmit}
-                disabled={!isFormValid}
+                disabled={!isFormValid || isPending}
               >
-                <Text className="text-white font-satoshi-bold text-lg">
-                  Continue
-                </Text>
+                {isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text className="text-white font-satoshi-bold text-lg">
+                    Continue
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

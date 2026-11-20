@@ -1,5 +1,5 @@
-import * as Crypto from "expo-crypto";
 import { PermissionsAndroid, Platform } from "react-native";
+import { notifyDiscoveryRevoked } from "../lib/discoveryEvents";
 import { BleManager } from "react-native-ble-plx";
 import { check, PERMISSIONS, request, RESULTS } from "react-native-permissions";
 import {
@@ -26,7 +26,6 @@ const getManager = () => {
 };
 
 export const bleDiscovery = new BleDiscoveryController({
-  randomUUID: Crypto.randomUUID,
   watchUnavailable(fail) {
     const subscription = getManager().onStateChange((state) => {
       if (state !== "PoweredOn") fail();
@@ -112,8 +111,11 @@ export const bleDiscovery = new BleDiscoveryController({
   },
   advertise: startDiscoveryAdvertising,
   stopAdvertising: stopDiscoveryAdvertising,
-  register: (token, auth) => broadcastDiscovery({ token }, auth),
-  revoke: stopDiscoveryBroadcast,
+  register: broadcastDiscovery,
+  async revoke(auth) {
+    await stopDiscoveryBroadcast(auth);
+    notifyDiscoveryRevoked();
+  },
   resolve: resolveObservedToken,
 });
 

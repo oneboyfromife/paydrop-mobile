@@ -1,29 +1,40 @@
 import { Text, TextInput } from "@/components/shared";
-import { useAppState } from "@/store/appState";
+import { updateProfile } from "@/services/user";
 import { useUserStore } from "@/store/userStore";
+import type { ApiError } from "@/utils/apiPayload";
+import { showToast } from "@/utils/toast";
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { Image, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, TouchableOpacity, View } from "react-native";
 
+/** "Edit profile": saves first/last name via PATCH /users/me. */
 export default function DisplayNameScreen() {
   const router = useRouter();
-  const [displayName, setDisplayName] = useState("");
-  const { setOnboardingCompleted } = useAppState();
+  const queryClient = useQueryClient();
   const user = useUserStore((state) => state.user);
-  const setUser = useUserStore((state) => state.setUser);
+  const [firstName, setFirstName] = useState<string>(user?.first_name ?? "");
+  const [lastName, setLastName] = useState<string>(user?.last_name ?? "");
+  const valid = firstName.trim() !== "" && lastName.trim() !== "";
 
-  const handleContinue = () => {
-    if (displayName.trim()) {
-      setUser({
-        ...user,
-        displayName,
-        name: displayName,
-      });
-      setOnboardingCompleted(true);
-      router.replace("/(tabs)/home");
-    }
-  };
+  const { mutate, isPending } = useMutation({
+    mutationFn: () =>
+      updateProfile({
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+      }),
+    onSuccess: async (updated) => {
+      const current = useUserStore.getState().user;
+      if (current?.id && updated?.id === current.id)
+        useUserStore.getState().setUser({ ...current, ...updated });
+      await queryClient.invalidateQueries({ queryKey: ["user-me"] });
+      showToast.success("Saved", "Your name has been updated.");
+      router.back();
+    },
+    onError: (error: ApiError) =>
+      showToast.error("Could not save", error.message),
+  });
 
   return (
     <View className="flex-1 bg-white px-6 pt-20">
@@ -45,28 +56,41 @@ export default function DisplayNameScreen() {
         What&apos;s your name?
       </Text>
       <Text className="text-base font-satoshi-regular text-grey-500 mb-10 leading-6">
-        Enter your full name so your friends and vendors can recognize you.
+        This is the name people see when they find you nearby.
       </Text>
 
-      <View className="bg-grey-50 h-16 rounded-xl justify-center px-6 mb-8 border border-grey-200">
+      <View className="bg-grey-50 h-16 rounded-xl justify-center px-6 mb-4 border border-grey-200">
         <TextInput
-          placeholder="e.g. John Doe"
+          placeholder="First name"
           placeholderTextColor="#9CA3AF"
           className="text-lg font-satoshi-regular text-black"
-          value={displayName}
-          onChangeText={setDisplayName}
+          value={firstName}
+          onChangeText={setFirstName}
           autoFocus
+        />
+      </View>
+      <View className="bg-grey-50 h-16 rounded-xl justify-center px-6 mb-8 border border-grey-200">
+        <TextInput
+          placeholder="Last name"
+          placeholderTextColor="#9CA3AF"
+          className="text-lg font-satoshi-regular text-black"
+          value={lastName}
+          onChangeText={setLastName}
         />
       </View>
 
       <TouchableOpacity
         className={`h-16 rounded-2xl justify-center items-center ${
-          displayName.trim() ? "bg-purple-500" : "bg-purple-300"
+          valid && !isPending ? "bg-purple-500" : "bg-purple-300"
         }`}
-        onPress={handleContinue}
-        disabled={!displayName.trim()}
+        onPress={() => mutate()}
+        disabled={!valid || isPending}
       >
-        <Text className="text-white font-satoshi-bold text-lg">Continue</Text>
+        {isPending ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text className="text-white font-satoshi-bold text-lg">Save</Text>
+        )}
       </TouchableOpacity>
     </View>
   );

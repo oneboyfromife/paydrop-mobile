@@ -281,6 +281,97 @@ test("an approval storage failure leaves the warning available and sends no conf
   assert.equal(requests, 1);
   assert.equal(useTransferStore.getState().active.phase, "flagged");
 });
+const httpError = (config, status, data) =>
+  Object.assign(new Error(`HTTP ${status}`), {
+    config,
+    response: { ...response(config, data), status },
+  });
+test("a 422 BLOCK body ends the payment as blocked with the server reason", async () => {
+  review();
+  api.defaults.adapter = async (config) => {
+    throw httpError(config, 422, {
+      success: false,
+      code: "TRANSFER_BLOCKED",
+      message: "Transfer blocked",
+      details: {
+        status: "BLOCKED",
+        verdict: "BLOCK",
+        fraud_score: 95,
+        reason: "High fraud risk",
+      },
+    });
+  };
+  await submitTransfer();
+  const active = useTransferStore.getState().active;
+  assert.equal(active.phase, "blocked");
+  assert.equal(active.message, "High fraud risk");
+});
+test("a 400 refusal ends the attempt as failed, while 409 and 5xx stay uncertain", async () => {
+  review();
+  api.defaults.adapter = async (config) => {
+    throw httpError(config, 400, {
+      success: false,
+      code: "VALIDATION_ERROR",
+      message: "Recipient cannot receive transfers yet",
+    });
+  };
+  await submitTransfer();
+  assert.equal(useTransferStore.getState().active.phase, "failed");
+  assert.equal(
+    useTransferStore.getState().active.message,
+    "Recipient cannot receive transfers yet",
+  );
+  for (const status of [409, 500]) {
+    review();
+    api.defaults.adapter = async (config) => {
+      throw httpError(config, status, { success: false, message: "x" });
+    };
+    await submitTransfer();
+    assert.equal(useTransferStore.getState().active.phase, "unknown");
+    useTransferStore.setState({
+      active: { ...useTransferStore.getState().active, phase: "failed" },
+    });
+  }
+});
+test("FLAG without an expiry uses the documented 15 minute confirm TTL and confirm sends transaction_id", async () => {
+  review();
+  const requests = [];
+  api.defaults.adapter = async (config) => {
+    requests.push(config);
+    return response(
+      config,
+      requests.length === 1
+        ? {
+            success: true,
+            data: {
+              transaction_id: "tx",
+              status: "PENDING_REVIEW",
+              verdict: "FLAG",
+              reason: "Unusual velocity",
+              confirm_token: "approval",
+              idempotency_key: "server-key",
+            },
+          }
+        : {
+            success: true,
+            data: { transaction_id: "tx", verdict: "ALLOW", status: "COMPLETED" },
+          },
+    );
+  };
+  const before = Date.now();
+  await submitTransfer();
+  const flagged = useTransferStore.getState().active;
+  assert.equal(flagged.phase, "flagged");
+  assert.equal(flagged.flag.reason, "Unusual velocity");
+  const ttl = flagged.flag.expiresAt - before;
+  assert.ok(ttl > 14 * 60 * 1000 && ttl <= 15 * 60 * 1000, String(ttl));
+  await confirmFlaggedTransfer();
+  assert.deepEqual(JSON.parse(requests[1].data), {
+    transaction_id: "tx",
+    confirm_token: "approval",
+  });
+  assert.equal(useTransferStore.getState().active.phase, "completed");
+});
 test("submissions require a configured lookup by the original idempotency key", async () => {
   review();
   delete process.env.EXPO_PUBLIC_TRANSFER_KEY_LOOKUP_PATH;

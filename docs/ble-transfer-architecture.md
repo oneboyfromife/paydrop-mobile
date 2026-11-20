@@ -25,27 +25,28 @@ Use `.env.example` as a reference; never commit real credentials.
 | `EXPO_PUBLIC_BLE_ENABLED` | `false` stops new BLE activity. QR/manual entry and transfer recovery continue. The default is enabled for development. A host flag service can call `bleDiscovery.setEnabled(false)` to stop an active lease immediately. No remote flag provider is assumed. |
 | `EXPO_PUBLIC_TRANSFER_CONTRACT_CONFIRMED` | Must equal `true` to submit or confirm a payment. Default is disabled. Enable only after verifying server idempotency, approval, expiry, lookup and ledger guarantees. |
 | `EXPO_PUBLIC_TRANSFER_STATUS_PATH` | Transaction lookup template, default `/transactions/:id`. Verify this route before release. |
-| `EXPO_PUBLIC_TRANSFER_KEY_LOOKUP_PATH` | Backend-agreed lookup template containing `:key`. No default route is invented. A relative route containing `:key` is required before new submissions or confirmations can be enabled, so a timeout before an ID is returned remains recoverable. |
+| `EXPO_PUBLIC_TRANSFER_KEY_LOOKUP_PATH` | Lookup template containing `:key`; the agreed route is `/transactions/by-idempotency-key/:key`. No default is compiled in. A relative route containing `:key` is required before new submissions or confirmations can be enabled, so a timeout before an ID is returned remains recoverable. |
+| `EXPO_PUBLIC_AUTH_TEST_MODE` | `true` shows a "Test login" panel on Login that lists `/auth/test-accounts` and signs in via `/auth/test-login` (backend `AUTH_TEST_MODE`, fixed OTP, no SMS). Dev/QA builds only. |
 | `EXPO_PUBLIC_REALTIME_URL` | Optional authenticated JSON WebSocket endpoint over `wss://`. No `/ws` or Socket.IO protocol is assumed. Omit when the transport contract is unavailable; REST recovery still works. |
 
 Public Expo settings are embedded at build time and are not secrets. A build-time flag change requires delivery of an updated configuration/bundle; it is not a remote operational kill switch. Connecting a remotely controlled flag service and cohort assignment remains a release integration task.
 
-## Staging contracts to freeze
+## Backend contracts
 
-These are the mobile adapter's expectations, not evidence of deployed backend behavior. Responses may be flat or wrapped in `data`.
+Source of truth: `https://paydrop-backend.onrender.com/docs` (OpenAPI at `/docs-json`). Success bodies are `{ success, message, data }`; errors are `{ success: false, code, message, details }` and are parsed by `toApiError` in `utils/apiPayload.ts`. Rows marked *verified* were exercised against the live API with the backend's test accounts on 2026-11-20.
 
-| Operation | Expected contract |
+| Operation | Contract |
 | --- | --- |
-| Register | `POST /discover/broadcast { token }`; return `expires_at` (ISO timestamp) or positive `ttl` / `expires_in` in seconds. Bind the UUID to the authenticated visible session. |
-| Revoke | `DELETE /discover/broadcast`; currently account-wide, therefore strictly serialized. Prefer a server session-scoped API when agreed. |
-| Resolve | `POST /discover/resolve { token }`; return `user`, `users`, or `resolved`. Profiles need string `id` and a display name or username. Return 404/410 for invalid/expired tokens. Rate-limit resolution. |
-| Social context | Optional `relationship`: `PAID_BEFORE`, `CONTACT_PAID`, `NO_PRIOR_RELATIONSHIP`; optional server `trust_tier`, `trust_score`, `mutual_trust`. Unrecognized/missing insight is unavailable. |
-| QR | `GET /discover/qr`; payload in `qr`, `payload`, `code`, `token`, or `discovery_token`, with explicit expiry/TTL. Resolve using `/discover/resolve`. Confirm whether QR issuance replaces any BLE session server-side; it must not silently invalidate a different live session. |
-| Submit | `POST /transactions/transfer { recipient_id, amount, note? }`; amount is integer kobo; `Idempotency-Key` header is stable for this intent. No hardcoded bank/NIP code is sent. |
-| Submit response | String `id` / `transaction_id`, `verdict` / `fraud_verdict` = ALLOW/FLAG/BLOCK, and independent `status`. Confirm actual terminal statuses; current adapter recognizes COMPLETED, FAILED, REJECTED, CANCELLED. |
-| Approval | FLAG returns `confirm_token` and server expiry. `POST /transactions/transfer/confirm { confirm_token }` with key `<intent-key>.confirm`. The server must make approval single-use, expiring, and idempotent. |
-| Lookup | GET by transaction ID and by the original idempotency key. A returned transaction ID must match the active ID when known. Return explicit status and, when available, recipient profile and amount for recovery receipts. Missing/404 results never authorize another debit. |
-| Events | Native WebSocket authenticates with `Authorization: Bearer ...` upgrade headers. JSON `{ id, type, transaction_id? }`, type is `balance.updated`, `transaction.updated`, or `payment.received`. Events are hints; server status is refetched. This adapter does not implement Socket.IO or OS push notifications. |
+| Register | `POST /discover/broadcast` with an empty body; the server issues the UUID and returns `token`, `expires_at`, `ttl` (180 s). The app advertises the returned token and rotates every 120 s. *Verified.* |
+| Revoke | `DELETE /discover/broadcast` (204) revokes every token the caller owns, **including the live QR token**, so the Receive QR is re-issued after each revoke (`lib/discoveryEvents.ts`). *Verified.* |
+| Resolve | `POST /discover/resolve { token }` returns `data.user` (`id`, names, `username`, `avatar_url`, `relationship`, `trust_score`, `trust_tier`, `mutual_trust`). Accepts BLE and QR tokens. 404 `TOKEN_INVALID`, 410 `TOKEN_EXPIRED`. A `tokens[]` batch form exists but is unused. *Verified.* |
+| QR | `GET /discover/qr` returns `qr` (`paydrop://discover?token=…`), `token`, `expires_at` (300 s). Independent of the BLE token. *Verified.* |
+| Submit | `POST /transactions/transfer { recipient_id, amount, note? }`, amount in kobo, `Idempotency-Key` header. The server honours the client key: a replay returns 409 `CONFLICT` with the same key in `details`. *Key handling verified.* |
+| Submit response | ALLOW: `transaction_id`, `verdict`, `status` (`COMPLETED`/`PENDING_REVIEW`/`BLOCKED`), `fraud_score`, `squad_ref`. BLOCK arrives as **HTTP 422** with `verdict: BLOCK` and `reason`. Other 400/403/422/429 refusals end the attempt as failed; 409, 5xx and timeouts stay uncertain. *Spec only; outcomes not yet exercised (test accounts cannot be funded).* |
+| Approval | FLAG returns `confirm_token` and `reason` but no expiry; the documented 15-minute TTL is applied (minus 30 s). `POST /transactions/transfer/confirm { transaction_id, confirm_token }` with key `<intent-key>.confirm`. *Spec only.* |
+| Lookup | `GET /transactions/:id` (`TransactionDto`: `PENDING`/`COMPLETED`/`FAILED`) and `GET /transactions/by-idempotency-key/:key` (404 when nothing was created). *Route verified.* |
+| Recipient eligibility | A recipient without a Squad virtual account is refused with 400 "Recipient cannot receive transfers yet". Virtual accounts are provisioned at KYC, so Tier 0 users cannot currently receive. *Verified; raised with the backend team.* |
+| Events | The backend exposes no WebSocket. `EXPO_PUBLIC_REALTIME_URL` stays unset and REST recovery is authoritative. Push (`/notifications/register-device`, FCM) is not wired in the app yet. |
 
 The backend must bind idempotency keys to sender and payload, reserve/debit available funds atomically, deduplicate settlement across webhooks and reconciliation, verify provider references, enforce authorization, and decide fraud-outage policy. These cannot be implemented or certified from this mobile repository.
 

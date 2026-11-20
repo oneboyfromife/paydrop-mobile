@@ -30,10 +30,10 @@ export interface DiscoveryDriver {
   stopScan(): void | Promise<void>;
   advertise(token: string): Promise<void>;
   stopAdvertising(): Promise<void>;
-  register(token: string, auth: DiscoveryAuth): Promise<DiscoveryRegistration>;
+  /** The server issues the token to advertise (POST /discover/broadcast with an empty body). */
+  register(auth: DiscoveryAuth): Promise<DiscoveryRegistration>;
   revoke(auth: DiscoveryAuth): Promise<void>;
   resolve(token: string, signal: AbortSignal): Promise<Resolution>;
-  randomUUID(): string;
   now?: () => number;
   watchUnavailable?(fail: () => void): () => void;
 }
@@ -244,13 +244,14 @@ export class BleDiscoveryController {
     }
     if (!this.isCurrent(revision)) return;
     const auth = { ...this.auth! };
-    const token = normalizeDiscoveryToken(this.driver.randomUUID());
-    if (!isValidBleServiceUuid(token))
-      throw new Error("Unable to create a Bluetooth session. Use QR.");
     // A timeout may still have registered the session: retain ownership before POST.
     this.registeredAuth = auth;
-    const { expiresAt } = await this.driver.register(token, auth);
+    const registration = await this.driver.register(auth);
+    const { expiresAt } = registration;
     if (!this.isCurrent(revision)) return;
+    const token = normalizeDiscoveryToken(registration.token);
+    if (!isValidBleServiceUuid(token))
+      throw new Error("Unable to create a Bluetooth session. Use QR.");
     if (!Number.isFinite(expiresAt) || expiresAt <= this.now() + 5000)
       throw new Error(
         "Could not confirm Bluetooth session validity. Use QR or retry.",

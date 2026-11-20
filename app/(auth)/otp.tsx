@@ -1,15 +1,14 @@
 import { Text, TextInput } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
-import { requestOtp, verifyOtp } from "@/services/auth";
+import { startSession } from "@/lib/session";
+import { requestOtp, verifyOtp, type OtpIntent } from "@/services/auth";
+import type { ApiError } from "@/utils/apiPayload";
 import { showToast } from "@/utils/toast";
-import { useAppState } from "@/store/appState";
-import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -25,83 +24,54 @@ export default function OTPScreen() {
   const params = useLocalSearchParams();
   const getParam = (value: string | string[] | undefined) =>
     Array.isArray(value) ? value[0] : value;
-  const phone = getParam(params.phone);
-  const mode = getParam(params.mode) || "signup";
+  const phone = getParam(params.phone) ?? "";
+  const mode: OtpIntent = getParam(params.mode) === "login" ? "login" : "signup";
   const firstName = getParam(params.firstName);
   const lastName = getParam(params.lastName);
   const email = getParam(params.email);
   const username = getParam(params.username);
-  const bvn = getParam(params.bvn);
-  const dob = getParam(params.dob);
-  const avatarUrl = getParam(params.avatarUrl);
   const isLoginMode = mode === "login";
 
-  ///...
-  const setTokens = useUserStore((state) => state.setTokens);
-  const setUser = useUserStore((state) => state.setUser);
-  const setOnboardingCompleted = useAppState(
-    (state) => state.setOnboardingCompleted,
-  );
-
-  ///...
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputRefs = useRef<Array<TextInput | null>>([]);
+  const [resendAt, setResendAt] = useState(
+    () => Date.now() + Number(getParam(params.resendAfter) ?? 60) * 1000,
+  );
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const resendIn = Math.max(0, Math.ceil((resendAt - now) / 1000));
 
   const { mutate: verifyMutate, isPending: isVerifying } = useMutation({
-    mutationFn: async (data: any) => await verifyOtp(data),
-    onSuccess: (data) => {
-      // Robust extraction for different API response formats
-      const accessToken =
-        data?.access_token ||
-        data?.accessToken ||
-        data?.token ||
-        data?.data?.token ||
-        data?.data?.accessToken ||
-        data?.data?.access_token;
-
-      const refreshToken =
-        data?.refresh_token ||
-        data?.refreshToken ||
-        data?.refresh ||
-        data?.data?.refreshToken ||
-        data?.data?.refresh_token;
-
-      const resolvedUser = data?.user || data?.data?.user || data?.data;
-
-      if (
-        typeof accessToken !== "string" ||
-        typeof resolvedUser?.id !== "string"
-      ) {
-        showToast.error(
-          "Verification Failed",
-          "The server returned an incomplete session. Please try again.",
-        );
-        return;
-      }
-      setTokens(
-        accessToken,
-        typeof refreshToken === "string" ? refreshToken : null,
-      );
-      setUser(resolvedUser);
-
-      setOnboardingCompleted(true);
+    mutationFn: verifyOtp,
+    onSuccess: (session) => {
+      startSession(session);
       router.replace("/(tabs)/home");
     },
-    onError: (error: any) => {
-      showToast.error(
-        "Verification Failed",
-        error?.message || "Invalid code. Please try again.",
-      );
+    onError: (error: ApiError) => {
+      if (error.code === "USERNAME_TAKEN" || error.code === "EMAIL_TAKEN") {
+        showToast.error("Update your details", error.message);
+        router.back();
+        return;
+      }
+      if (error.code === "OTP_EXPIRED") setOtp(["", "", "", "", "", ""]);
+      showToast.error("Verification Failed", error.message);
     },
   });
 
   const { mutate: resendMutate, isPending: isResending } = useMutation({
-    mutationFn: async () => await requestOtp(mode as string, phone as string),
-    onSuccess: () => {
-      showToast.success("Success", "OTP has been resent to your phone.");
+    mutationFn: () => requestOtp(mode, phone),
+    onSuccess: ({ resendAfter }) => {
+      setResendAt(Date.now() + resendAfter * 1000);
+      showToast.success("Code sent", "A new code is on its way.");
     },
-    onError: () => {
-      showToast.error("Error", "Failed to resend OTP. Please try again.");
+    onError: (error: ApiError) => {
+      const retryAfter = Number(error.details.retry_after);
+      if (Number.isFinite(retryAfter) && retryAfter > 0)
+        setResendAt(Date.now() + retryAfter * 1000);
+      showToast.error("Could not resend", error.message);
     },
   });
 
@@ -121,38 +91,29 @@ export default function OTPScreen() {
   };
 
   const handleVerify = () => {
-    ///temp bypass....
-    // setOnboardingCompleted(true);
-    // router.replace("/(tabs)/home");
-    // return;
-
     const otpValue = otp.join("");
     if (otpValue.length < 6) {
       showToast.error("Error", "Please enter the complete 6-digit code");
       return;
     }
 
-    const requestData: any = {
+    verifyMutate({
+      intent: mode,
       phone,
       otp: otpValue,
-      intent: mode,
-    };
-
-    if (!isLoginMode) {
-      requestData.first_name = firstName;
-      requestData.last_name = lastName;
-      requestData.email = email;
-      requestData.username = username;
-      requestData.bvn = bvn;
-      requestData.dob = dob;
-      requestData.avatar_url = avatarUrl;
-    }
-
-    verifyMutate(requestData);
+      ...(isLoginMode
+        ? {}
+        : {
+            first_name: firstName,
+            last_name: lastName,
+            username,
+            ...(email ? { email } : {}),
+          }),
+    });
   };
 
   const handleResend = () => {
-    if (isResending) return;
+    if (isResending || resendIn > 0) return;
     resendMutate();
   };
 
@@ -236,9 +197,14 @@ export default function OTPScreen() {
                 <Text className="text-grey-500 font-satoshi-regular text-base">
                   Didn&apos;t receive the code?{" "}
                 </Text>
-                <TouchableOpacity onPress={handleResend}>
-                  <Text className="text-purple-500 font-satoshi-bold text-base">
-                    Resend
+                <TouchableOpacity
+                  onPress={handleResend}
+                  disabled={isResending || resendIn > 0}
+                >
+                  <Text
+                    className={`font-satoshi-bold text-base ${resendIn > 0 ? "text-grey-400" : "text-purple-500"}`}
+                  >
+                    {resendIn > 0 ? `Resend in ${resendIn}s` : "Resend"}
                   </Text>
                 </TouchableOpacity>
               </View>

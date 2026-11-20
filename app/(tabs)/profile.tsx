@@ -1,23 +1,35 @@
 import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
+import { endSession } from "@/lib/session";
+import { getMe } from "@/services/user";
 import { useUserStore } from "@/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { Alert, Image, ScrollView, TouchableOpacity, View } from "react-native";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const user = useUserStore((state) => state.user);
-  const logout = useUserStore((state) => state.logout);
+  const accessToken = useUserStore((state) => state.accessToken);
+  const storedUser = useUserStore((state) => state.user);
+  // Same cache entry as Home; the persisted session only keeps the account id.
+  const { data: me } = useQuery({
+    queryKey: ["user-me", accessToken],
+    queryFn: getMe,
+    enabled: !!accessToken,
+  });
+  const user = me ?? storedUser;
 
   const fullName =
     user?.first_name && user?.last_name
       ? `${user.first_name} ${user.last_name}`
       : "PayDrop User";
-  const username = user?.username || "@paydrop_user";
-  const avatar = user?.avatar;
-  const trustScore = user?.trust_score || 92;
+  const username: string | null = user?.username ?? null;
+  const avatar: string | null = user?.avatar_url ?? null;
+  const trustScore: number | null =
+    typeof user?.trust_score === "number" ? user.trust_score : null;
+  const verified = user?.kyc_status === "VERIFIED" || !!user?.kyc_verified;
 
   const handleAvatarPress = async () => {
     const permissionResult =
@@ -44,7 +56,7 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = () => {
-    logout();
+    endSession();
     router.replace("/(auth)/login");
   };
 
@@ -102,84 +114,43 @@ export default function ProfileScreen() {
             <Text className="text-black font-satoshi-bold text-2xl mb-1">
               {fullName}
             </Text>
-            <Text className="text-grey-500 font-satoshi-regular text-base mb-4">
-              @{username}
-            </Text>
-          </View>
-
-          {/* Trust Score with Progress Bar */}
-          <View className="bg-grey-50 rounded-2xl p-4 mb-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-black font-satoshi-bold text-base">
-                Trust Score
+            {username ? (
+              <Text className="text-grey-500 font-satoshi-regular text-base mb-4">
+                @{username}
               </Text>
-              <View className="bg-green-100 rounded-full px-3 py-1">
-                <Text className="text-green-600 font-satoshi-medium text-sm">
-                  {trustScore}%
-                </Text>
-              </View>
-            </View>
-            <View className="h-2 bg-grey-200 rounded-full overflow-hidden">
-              <View
-                style={{ width: `${trustScore}%` }}
-                className="h-full bg-gradient-to-r from-green-400 to-green-600"
-              />
-            </View>
+            ) : null}
           </View>
 
-          {/* KYC Status */}
-          {/* <View className="flex-row items-center bg-blue-50 rounded-2xl p-3 border border-blue-100">
-          <Ionicons name="shield-checkmark" size={20} color="#3B82F6" />
-          <Text className="text-blue-600 font-satoshi-regular text-sm ml-3 flex-1">
-            {user?.kyc_verified
-              ? "KYC Verified"
-              : "Complete KYC to unlock features"}
-          </Text>
-        </View> */}
-        </View>
-
-        {/* Trust Breakdown Card */}
-        <View className="bg-white rounded-3xl mx-6 mt-6 p-6 border border-grey-100">
-          <Text className="text-black font-satoshi-bold text-lg mb-4">
-            Trust Breakdown
-          </Text>
-          <View className="space-y-3 gap-4">
-            <View className="flex-row items-center p-4 bg-blue-50 rounded-2xl border border-blue-100">
-              <View className="w-12 h-12 bg-blue-100 rounded-full items-center justify-center mr-4">
-                <Ionicons
-                  name="swap-horizontal-outline"
-                  size={20}
-                  color="#3B82F6"
+          {trustScore !== null && (
+            <View className="bg-grey-50 rounded-2xl p-4 mb-4">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-black font-satoshi-bold text-base">
+                  Trust Score
+                </Text>
+                <View className="bg-green-100 rounded-full px-3 py-1">
+                  <Text className="text-green-600 font-satoshi-medium text-sm">
+                    {trustScore}%{user?.trust_tier ? ` · ${user.trust_tier}` : ""}
+                  </Text>
+                </View>
+              </View>
+              <View className="h-2 bg-grey-200 rounded-full overflow-hidden">
+                <View
+                  style={{ width: `${Math.max(0, Math.min(100, trustScore))}%` }}
+                  className="h-full bg-green-500"
                 />
               </View>
-              <View className="flex-1">
-                <Text className="text-black font-satoshi-bold text-sm">
-                  Successful Payments
-                </Text>
-                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
-                  143 transactions
-                </Text>
-              </View>
-              <Text className="text-blue-600 font-satoshi-bold text-lg">
-                143
-              </Text>
             </View>
-            <View className="flex-row items-center p-4 bg-purple-50 rounded-2xl border border-purple-100">
-              <View className="w-12 h-12 bg-purple-100 rounded-full items-center justify-center mr-4">
-                <Ionicons name="people-outline" size={20} color="#A855F7" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-black font-satoshi-bold text-sm">
-                  Mutual Trust
-                </Text>
-                <Text className="text-grey-500 font-satoshi-regular text-xs mt-1">
-                  People trust you
-                </Text>
-              </View>
-              <Text className="text-purple-600 font-satoshi-bold text-lg">
-                38
-              </Text>
-            </View>
+          )}
+
+          <View className="flex-row items-center bg-blue-50 rounded-2xl p-3 border border-blue-100">
+            <Ionicons
+              name={verified ? "shield-checkmark" : "shield-outline"}
+              size={20}
+              color="#3B82F6"
+            />
+            <Text className="text-blue-600 font-satoshi-regular text-sm ml-3 flex-1">
+              {verified ? "Identity verified" : "Identity not verified (optional)"}
+            </Text>
           </View>
         </View>
 
