@@ -154,9 +154,22 @@ test("API error envelope exposes status, code and message; network failures get 
       details: { phone: "+2348000000001" },
     },
   );
-  const offline = toApiError(new Error("Network Error"));
+  const offline = toApiError(
+    Object.assign(new Error("Network Error"), { isAxiosError: true }),
+  );
   assert.equal(offline.status, null);
   assert.match(offline.message, /connection/);
+  const slow = toApiError(
+    Object.assign(new Error("timeout of 15000ms exceeded"), {
+      isAxiosError: true,
+      code: "ECONNABORTED",
+    }),
+  );
+  assert.match(slow.message, /taking too long/);
+  assert.equal(
+    toApiError(new Error("Unlock your device and retry secure sign-in.")).message,
+    "Unlock your device and retry secure sign-in.",
+  );
 });
 test("transfer responses follow the Swagger field names inside the success envelope", () => {
   const blocked = interpretTransferResponse(

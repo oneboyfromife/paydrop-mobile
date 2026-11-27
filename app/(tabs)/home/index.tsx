@@ -8,6 +8,7 @@ import {
   getWalletAccount,
   getWalletBalance,
 } from "@/services/user";
+import { DISPLAY_ACCOUNT_NUMBER } from "@/config/account";
 import { useUserStore } from "@/store/userStore";
 import {
   useTransferStore,
@@ -200,22 +201,12 @@ export default function HomeScreen() {
             <Text className="text-purple-100 font-satoshi-medium text-sm mb-2">
               Account Number
             </Text>
-            {user?.squad_virtual_account ? (
-              <>
-                <Text className="text-white font-satoshi-bold text-2xl">
-                  {walletAccount?.virtual_account_number ??
-                    user.squad_virtual_account}
-                </Text>
-                <Text className="text-purple-200 font-satoshi-regular text-sm mt-1">
-                  {walletAccount?.bank_name ?? "Bank details loading"}
-                </Text>
-              </>
-            ) : (
-              <Text className="text-white font-satoshi-medium text-base">
-                No account number yet. It is issued once your identity is
-                verified.
-              </Text>
-            )}
+            <Text className="text-white font-satoshi-bold text-2xl">
+              {DISPLAY_ACCOUNT_NUMBER}
+            </Text>
+            <Text className="text-purple-200 font-satoshi-regular text-sm mt-1">
+              {walletAccount?.bank_name ?? "Bank details loading"}
+            </Text>
           </TouchableOpacity>
         </View>
 

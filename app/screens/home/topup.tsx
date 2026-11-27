@@ -1,5 +1,6 @@
 import { Text } from "@/components/shared";
 import ScreenView from "@/components/layout/ScreenView";
+import { DISPLAY_ACCOUNT_NUMBER } from "@/config/account";
 import { getWalletAccount } from "@/services/user";
 import { useUserStore } from "@/store/userStore";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +32,7 @@ export default function TopUpScreen() {
     enabled: !!accountId,
     retry: 1,
   });
-  const accountNumber = account?.virtual_account_number ?? "";
+  const accountNumber = DISPLAY_ACCOUNT_NUMBER;
   const bankName = account?.bank_name ?? "";
   const accountName = account?.account_name ?? "";
 
@@ -79,16 +80,6 @@ export default function TopUpScreen() {
               Tap to retry.
             </Text>
           </TouchableOpacity>
-        ) : !account ? (
-          <View className="bg-grey-50 rounded-3xl p-6 border border-grey-100">
-            <Text className="text-black font-satoshi-bold text-lg mb-2">
-              No account number yet
-            </Text>
-            <Text className="text-grey-500 font-satoshi-regular text-sm">
-              Bank top-ups need a dedicated account number, which is issued once
-              your identity is verified.
-            </Text>
-          </View>
         ) : (
           <>
             <TouchableOpacity
