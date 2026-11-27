@@ -20,15 +20,26 @@ export const toApiError = (
   error: unknown,
   fallback = "Something went wrong. Please try again.",
 ): ApiError => {
-  const response = asRecord(asRecord(error).response);
+  const record = asRecord(error);
+  const response = asRecord(record.response);
   const body = asRecord(response.data);
   const status = typeof response.status === "number" ? response.status : null;
+  const isAxios = record.isAxiosError === true;
+  const timedOut =
+    record.code === "ECONNABORTED" || record.code === "ETIMEDOUT";
   const message =
     typeof body.message === "string" && body.message.trim()
       ? body.message
-      : status === null
-        ? "Check your connection and try again."
-        : fallback;
+      : status !== null
+        ? fallback
+        : timedOut
+          ? "The server is taking too long to respond. Please try again in a moment."
+          : !isAxios &&
+              typeof record.message === "string" &&
+              record.message.trim()
+            ? // App-side failures (e.g. secure storage locked) keep their own message.
+              record.message
+            : "Check your connection and try again.";
   return {
     status,
     code: typeof body.code === "string" ? body.code : null,
